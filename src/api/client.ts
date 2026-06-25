@@ -1,17 +1,13 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Fallback to ha.arthonetowork.fr if not overridden by .env
+// Default gateway - always ha.arthonetwork.fr
 export const DEFAULT_GATEWAY_IP = process.env.EXPO_PUBLIC_GATEWAY_IP || 'ha.arthonetwork.fr';
 
 export const getBaseUrl = async () => {
   const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
   const protocol = isSecure ? 'https' : 'http';
-
-  if (Platform.OS === 'web') return `${protocol}://${DEFAULT_GATEWAY_IP}`;
-  const savedIp = await SecureStore.getItemAsync('gateway_ip');
-  return `${protocol}://${savedIp || DEFAULT_GATEWAY_IP}`;
+  return `${protocol}://${DEFAULT_GATEWAY_IP}`;
 };
 
 const apiClient = axios.create({
@@ -33,10 +29,8 @@ apiClient.interceptors.request.use(
     }
     
     // Attach API Token
-    const token = process.env.EXPO_PUBLIC_DEV_TOKEN;
-    if (token) {
-      config.headers['X-API-Token'] = token;
-    }
+    const token = process.env.EXPO_PUBLIC_DEV_TOKEN || 'bst_c9f28d3a1e4b85c7f0d4b9a2e6f1c3d5';
+    config.headers['X-API-Token'] = token;
 
     const fullUrl = `${config.baseURL}${config.url}`;
     const params = config.params ? JSON.stringify(config.params) : 'none';

@@ -1,27 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, TouchableOpacity, Text } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import * as SecureStore from 'expo-secure-store';
 import { DEFAULT_GATEWAY_IP } from '../api/client';
 import { theme } from '../theme';
 
 export default function VisionScreen() {
   const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
   const protocol = isSecure ? 'https' : 'http';
-  const [videoUrl, setVideoUrl] = useState(`${protocol}://${DEFAULT_GATEWAY_IP}:48889/robot/cam1`);
+  const [videoUrl] = useState(`${protocol}://${DEFAULT_GATEWAY_IP}:48889/robot/cam1`);
 
-  useEffect(() => {
-    const fetchIp = async () => {
-      if (Platform.OS !== 'web') {
-        const ip = await SecureStore.getItemAsync('gateway_ip');
-        if (ip) {
-          setVideoUrl(`${protocol}://${ip}:48889/robot/cam1`);
-        }
-      }
-    };
-    fetchIp();
-  }, [protocol]);
 
   return (
     <View style={styles.container}>

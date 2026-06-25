@@ -33,6 +33,10 @@ jobs:
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --no-install --clean
+        env:
+          EXPO_PUBLIC_GATEWAY_IP: ha.arthonetwork.fr
+          EXPO_PUBLIC_USE_SSL: "true"
+          EXPO_PUBLIC_DEV_TOKEN: ${{ secrets.API_TOKEN }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

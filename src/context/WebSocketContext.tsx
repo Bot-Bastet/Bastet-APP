@@ -77,12 +77,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (ws.current) return;
 
     try {
-      let savedIp = DEFAULT_GATEWAY_IP;
       let token = process.env.EXPO_PUBLIC_DEV_TOKEN || null;
 
       if (!token) {
         if (Platform.OS !== 'web') {
-          savedIp = (await SecureStore.getItemAsync('gateway_ip')) || DEFAULT_GATEWAY_IP;
           token = await SecureStore.getItemAsync('jwt_token');
         } else {
           token = localStorage.getItem('jwt_token');
@@ -94,9 +92,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
       const protocol = isSecure ? 'wss' : 'ws';
 
-      // Note: React Native WebSocket supports headers, but Web doesn't. 
+      // Note: React Native WebSocket supports headers, but Web doesn't.
       // Using query param for token is safer across platforms if Gateway supports it.
-      const url = `${protocol}://${savedIp}:44888/ws/app?token=${token}`;
+      const url = `${protocol}://${DEFAULT_GATEWAY_IP}:44888/ws/app?token=${token}`;
       
       const socket = new WebSocket(url);
 
