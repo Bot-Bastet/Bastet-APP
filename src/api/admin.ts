@@ -1,7 +1,12 @@
 import apiClient from './client';
+import { UserAccount } from '../types';
 
-export const getAllUsers = async () => {
-  const response = await apiClient.get('/admin/users');
+/**
+ * GET /accounts — Liste tous les comptes enregistrés (nécessite Admin)
+ * Corrigé : /admin/users → /accounts (cf. DocsGateway Section 2)
+ */
+export const getAllUsers = async (): Promise<UserAccount[]> => {
+  const response = await apiClient.get('/accounts');
   return response.data;
 };
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Switch } from 'react-native';
-import { Power, Settings, Shield, User, Bell, ChevronRight, HardDrive } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Power, Settings, Shield, User, Bell, ChevronRight, HardDrive, Wifi, ScanFace, Download } from 'lucide-react-native';
 import { theme } from '../theme';
 
-const SettingRow = ({ icon: Icon, title, subtitle, hasSwitch, value, onValueChange, onPress }: any) => (
+const SettingRow = ({ icon: Icon, title, subtitle, hasSwitch, value, onValueChange, onPress, iconColor }: any) => (
   <TouchableOpacity 
     style={styles.settingRow} 
     activeOpacity={0.8}
@@ -11,7 +12,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, hasSwitch, value, onValueChan
     disabled={hasSwitch}
   >
     <View style={styles.settingLeft}>
-      <Icon color={theme.colors.text} size={24} strokeWidth={1.5} />
+      <Icon color={iconColor || theme.colors.text} size={24} strokeWidth={1.5} />
       <View style={{ marginLeft: 16 }}>
         <Text style={styles.settingTitle}>{title}</Text>
         {subtitle && <Text style={styles.settingSub}>{subtitle}</Text>}
@@ -64,6 +65,31 @@ export default function SettingsScreen({ navigation }: any) {
             hasSwitch
             value={bioAuth}
             onValueChange={setBioAuth}
+          />
+          <SettingRow 
+            icon={ScanFace} 
+            title="Gestion des Visages" 
+            subtitle="Consultation et suppression des visages enregistrés"
+            iconColor={theme.colors.secondary}
+            onPress={() => navigation.navigate('FacesManagement')}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>R O B O T</Text>
+          <SettingRow 
+            icon={Wifi} 
+            title="WiFi Robot" 
+            subtitle="Scanner les réseaux à proximité du robot"
+            iconColor={theme.colors.success}
+            onPress={() => navigation.navigate('WifiScan')}
+          />
+          <SettingRow 
+            icon={Download} 
+            title="Mises à jour système" 
+            subtitle="Gateway, Robot, Arduino"
+            iconColor={theme.colors.primary}
+            onPress={() => navigation.navigate('SystemUpdate')}
           />
         </View>
 
