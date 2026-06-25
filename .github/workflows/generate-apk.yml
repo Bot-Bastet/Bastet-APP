@@ -31,32 +31,48 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Install metro deps for debug bundle
+        run: npm install --save-dev @react-native-community/cli @react-native-community/cli-platform-android @react-native/metro-config --legacy-peer-deps
+
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --no-install --clean
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Android APK
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Bundle JS for debug APK
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false \
+            --entry-file index.ts \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
 
-      - name: Collect APK
+      - name: Build both APKs
+        working-directory: android
+        run: ./gradlew assembleRelease assembleDebug --no-daemon
+
+      - name: Collect APKs
         run: |
           mkdir -p build-output
           cp android/app/build/outputs/apk/release/app-release.apk build-output/Bastet-${{ github.ref_name }}.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Bastet-${{ github.ref_name }}-debug.apk
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Bastet-APK-${{ github.ref_name }}
-          path: build-output/Bastet-${{ github.ref_name }}.apk
+          path: |
+            build-output/Bastet-${{ github.ref_name }}.apk
+            build-output/Bastet-${{ github.ref_name }}-debug.apk
 
-      - name: Create Release and Upload Asset
+      - name: Create Release and Upload Assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: build-output/Bastet-${{ github.ref_name }}.apk
+          files: |
+            build-output/Bastet-${{ github.ref_name }}.apk
+            build-output/Bastet-${{ github.ref_name }}-debug.apk
           generate_release_notes: true
           draft: false
         env:

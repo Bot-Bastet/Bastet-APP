@@ -6,6 +6,7 @@ import { login, register } from '../api/auth';
 import * as SecureStore from 'expo-secure-store';
 import { useWebSocket } from '../context/WebSocketContext';
 import { Mail, Lock, User, ChevronRight, Phone } from 'lucide-react-native';
+import { DEFAULT_GATEWAY_IP } from '../api/client';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 
 export default function LoginScreen({ navigation }: any) {
@@ -62,6 +63,7 @@ export default function LoginScreen({ navigation }: any) {
           if (Platform.OS !== 'web') {
             await SecureStore.setItemAsync('jwt_token', tokenStr);
             await SecureStore.setItemAsync('user_info', userStr);
+            await SecureStore.setItemAsync('gateway_ip', DEFAULT_GATEWAY_IP);
           } else {
             localStorage.setItem('jwt_token', tokenStr);
             localStorage.setItem('user_info', userStr);
