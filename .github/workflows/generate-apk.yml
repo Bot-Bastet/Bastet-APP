@@ -37,42 +37,26 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install missing CLI
-        run: npm install --save-dev @react-native-community/cli @react-native-community/cli-platform-android --legacy-peer-deps
-
-      - name: Bundle JS for debug
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle --platform android --dev false \
-            --entry-file index.ts \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
-
-      - name: Build both APKs
+      - name: Build Android APK
         working-directory: android
-        run: ./gradlew assembleRelease assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Collect APKs
+      - name: Collect APK
         run: |
           mkdir -p build-output
           cp android/app/build/outputs/apk/release/app-release.apk build-output/Bastet-${{ github.ref_name }}.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Bastet-${{ github.ref_name }}-debug.apk
 
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Bastet-APK-${{ github.ref_name }}
-          path: |
-            build-output/Bastet-${{ github.ref_name }}.apk
-            build-output/Bastet-${{ github.ref_name }}-debug.apk
+          path: build-output/Bastet-${{ github.ref_name }}.apk
 
-      - name: Create Release and Upload Assets
+      - name: Create Release and Upload Asset
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build-output/Bastet-${{ github.ref_name }}.apk
-            build-output/Bastet-${{ github.ref_name }}-debug.apk
+          files: build-output/Bastet-${{ github.ref_name }}.apk
           generate_release_notes: true
           draft: false
         env:
