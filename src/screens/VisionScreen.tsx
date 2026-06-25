@@ -7,7 +7,7 @@ import { DEFAULT_GATEWAY_IP } from '../api/client';
 import { theme } from '../theme';
 
 export default function VisionScreen() {
-  const isSecure = process.env.EXPO_PUBLIC_USE_SSL === 'true';
+  const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
   const protocol = isSecure ? 'https' : 'http';
   const [videoUrl, setVideoUrl] = useState(`${protocol}://${DEFAULT_GATEWAY_IP}:48889/robot/cam1`);
 

@@ -91,7 +91,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (!token) return; // Wait for login
 
-      const isSecure = process.env.EXPO_PUBLIC_USE_SSL === 'true';
+      const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
       const protocol = isSecure ? 'wss' : 'ws';
 
       // Note: React Native WebSocket supports headers, but Web doesn't. 

@@ -2,16 +2,16 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Fallback IP to .env if not set by user
-export const DEFAULT_GATEWAY_IP = process.env.EXPO_PUBLIC_GATEWAY_IP || '192.168.1.108';
+// Fallback to ha.arthonetowork.fr if not overridden by .env
+export const DEFAULT_GATEWAY_IP = process.env.EXPO_PUBLIC_GATEWAY_IP || 'ha.arthonetwork.fr';
 
 export const getBaseUrl = async () => {
-  const isSecure = process.env.EXPO_PUBLIC_USE_SSL === 'true';
+  const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
   const protocol = isSecure ? 'https' : 'http';
-  
-  if (Platform.OS === 'web') return `${protocol}://${DEFAULT_GATEWAY_IP}:44888`;
+
+  if (Platform.OS === 'web') return `${protocol}://${DEFAULT_GATEWAY_IP}`;
   const savedIp = await SecureStore.getItemAsync('gateway_ip');
-  return `${protocol}://${savedIp || DEFAULT_GATEWAY_IP}:44888`;
+  return `${protocol}://${savedIp || DEFAULT_GATEWAY_IP}`;
 };
 
 const apiClient = axios.create({
