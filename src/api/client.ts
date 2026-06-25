@@ -29,8 +29,10 @@ apiClient.interceptors.request.use(
     }
     
     // Attach API Token
-    const token = process.env.EXPO_PUBLIC_DEV_TOKEN || 'bst_c9f28d3a1e4b85c7f0d4b9a2e6f1c3d5';
-    config.headers['X-API-Token'] = token;
+    const token = process.env.EXPO_PUBLIC_DEV_TOKEN;
+    if (token) {
+      config.headers['X-API-Token'] = token;
+    }
 
     const fullUrl = `${config.baseURL}${config.url}`;
     const params = config.params ? JSON.stringify(config.params) : 'none';
