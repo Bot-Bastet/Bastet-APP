@@ -165,6 +165,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
               break;
             }
+            
+            case 'keep_stream_status': {
+              const cam = data.camera || data.payload?.camera;
+              const keep = data.keep ?? data.payload?.keep;
+              console.log(`   ↳ [WS] 📹 Keep Stream: cam${cam} = ${keep ? 'KEEP ACTIVE' : 'LET DIE'}`);
+              break;
+            }
 
             // ─── Progression des mises à jour (Section 7) ─
             case 'gateway_update_progress':
