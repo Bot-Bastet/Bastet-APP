@@ -35,11 +35,18 @@ interface WSContextData {
   telemetry: TelemetryDiagnostics | null;
   wifiNetworks: WifiNetwork[];
   wifiScanning: boolean;
+  knownSsids: string[];
+  wifiConnecting: boolean;
+  wifiConnectionResult: { status: 'success' | 'error', message: string } | null;
+  wifiForgetting: boolean;
   updateProgress: { gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null };
   sendMessage: (text: string) => void;
   sendJoystick: (x: number, y: number) => void;
   sendWifiScan: () => void;
   sendCameraSetup: (camera: 1 | 2, enable: boolean) => void;
+  connectWifi: (ssid: string, password?: string) => void;
+  forgetWifi: (ssid: string) => void;
+  clearWifiConnectionResult: () => void;
   sendRaw: (data: any) => void;
   connect: () => void;
   disconnect: () => void;
@@ -67,6 +74,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [telemetry, setTelemetry] = useState<TelemetryDiagnostics | null>(null);
   const [wifiNetworks, setWifiNetworks] = useState<WifiNetwork[]>([]);
   const [wifiScanning, setWifiScanning] = useState(false);
+  const [knownSsids, setKnownSsids] = useState<string[]>([]);
+  const [wifiConnecting, setWifiConnecting] = useState(false);
+  const [wifiConnectionResult, setWifiConnectionResult] = useState<{ status: 'success' | 'error', message: string } | null>(null);
+  const [wifiForgetting, setWifiForgetting] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<{ gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null }>({
     gateway: null, robot: null, arduino: null
   });
@@ -146,10 +157,31 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             // ─── Liste WiFi reçue du robot ────────────────
             case 'wifi_list': {
-              const networks = data.payload || data.networks || [];
-              console.log(`   ↳ [WS] 📶 WiFi: ${networks.length} réseaux reçus`);
+              const networks = data.payload?.networks || data.networks || [];
+              const ssids = data.payload?.known_ssids || data.known_ssids || [];
+              console.log(`   ↳ [WS] 📶 WiFi: ${networks.length} réseaux reçus, ${ssids.length} connus`);
               setWifiNetworks(networks);
+              setKnownSsids(ssids);
               setWifiScanning(false);
+              break;
+            }
+
+            case 'wifi_connect_result': {
+              const status = data.payload?.status || data.status;
+              const msg = data.payload?.message || data.message || '';
+              console.log(`   ↳ [WS] 📶 Connection WiFi résultat: ${status} - ${msg}`);
+              setWifiConnecting(false);
+              setWifiConnectionResult({ status, message: msg });
+              break;
+            }
+
+            case 'wifi_forget_result': {
+              const status = data.payload?.status || data.status;
+              const msg = data.payload?.message || data.message || '';
+              console.log(`   ↳ [WS] 📶 Oubli WiFi résultat: ${status} - ${msg}`);
+              setWifiForgetting(false);
+              // Trigger a rescan to update known lists
+              ws.current?.send(JSON.stringify({ type: 'scan_wifi' }));
               break;
             }
 
@@ -286,6 +318,38 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [connected]);
 
+  const connectWifi = useCallback((ssid: string, password?: string) => {
+    if (ws.current && connected) {
+      console.log(`📤 [WS SEND] CONNECT_WIFI: ${ssid}`);
+      setWifiConnecting(true);
+      setWifiConnectionResult(null);
+      ws.current.send(JSON.stringify({ 
+        type: 'connect_wifi', 
+        ssid, 
+        password 
+      }));
+    } else {
+      console.warn(`⚠️ [WS SEND] CANNOT CONNECT_WIFI, NOT CONNECTED`);
+    }
+  }, [connected]);
+
+  const forgetWifi = useCallback((ssid: string) => {
+    if (ws.current && connected) {
+      console.log(`📤 [WS SEND] FORGET_WIFI: ${ssid}`);
+      setWifiForgetting(true);
+      ws.current.send(JSON.stringify({ 
+        type: 'forget_wifi', 
+        ssid 
+      }));
+    } else {
+      console.warn(`⚠️ [WS SEND] CANNOT FORGET_WIFI, NOT CONNECTED`);
+    }
+  }, [connected]);
+
+  const clearWifiConnectionResult = useCallback(() => {
+    setWifiConnectionResult(null);
+  }, []);
+
   useEffect(() => {
     // Attempt initial connect if token exists
     connect();
@@ -300,11 +364,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       telemetry,
       wifiNetworks,
       wifiScanning,
+      knownSsids,
+      wifiConnecting,
+      wifiConnectionResult,
+      wifiForgetting,
       updateProgress,
       sendMessage, 
       sendJoystick,
       sendWifiScan,
       sendCameraSetup,
+      connectWifi,
+      forgetWifi,
+      clearWifiConnectionResult,
       sendRaw,
       connect, 
       disconnect 
