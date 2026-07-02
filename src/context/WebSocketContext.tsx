@@ -38,6 +38,7 @@ interface WSContextData {
   knownSsids: string[];
   wifiConnecting: boolean;
   wifiConnectionResult: { status: 'success' | 'error', message: string } | null;
+  wifiScanError: { error: string; interface: string; manager: string } | null;
   wifiForgetting: boolean;
   updateProgress: { gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null };
   sendMessage: (text: string) => void;
@@ -47,6 +48,7 @@ interface WSContextData {
   connectWifi: (ssid: string, password?: string) => void;
   forgetWifi: (ssid: string) => void;
   clearWifiConnectionResult: () => void;
+  clearWifiScanError: () => void;
   sendRaw: (data: any) => void;
   connect: () => void;
   disconnect: () => void;
@@ -77,6 +79,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [knownSsids, setKnownSsids] = useState<string[]>([]);
   const [wifiConnecting, setWifiConnecting] = useState(false);
   const [wifiConnectionResult, setWifiConnectionResult] = useState<{ status: 'success' | 'error', message: string } | null>(null);
+  const [wifiScanError, setWifiScanError] = useState<{ error: string; interface: string; manager: string } | null>(null);
   const [wifiForgetting, setWifiForgetting] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<{ gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null }>({
     gateway: null, robot: null, arduino: null
@@ -163,6 +166,19 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               setWifiNetworks(networks);
               setKnownSsids(ssids);
               setWifiScanning(false);
+              break;
+            }
+
+            // ─── Échec du scan WiFi (agent bloqué ou interface verrouillée) ─
+            // Canal DEDIE pour ne PAS déclencher l'auto-rescan conditionné par
+            // wifiConnectionResult dans WifiScreen (évite la boucle ping-pong).
+            case 'wifi_list_error': {
+              const errMsg = data.payload?.error || data.error || 'Erreur inconnue';
+              const iface = data.payload?.interface || data.interface || 'wlan0';
+              const mgr = data.payload?.manager || data.manager || 'inconnu';
+              console.warn(`   ↳ [WS] 📶⚠️ Scan WiFi échoué: ${errMsg} (iface=${iface}, mgr=${mgr})`);
+              setWifiScanning(false);
+              setWifiScanError({ error: errMsg, interface: iface, manager: mgr });
               break;
             }
 
@@ -350,11 +366,27 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setWifiConnectionResult(null);
   }, []);
 
+  const clearWifiScanError = useCallback(() => {
+    setWifiScanError(null);
+  }, []);
+
   useEffect(() => {
     // Attempt initial connect if token exists
     connect();
     return () => disconnect();
   }, []);
+
+  // ─── Watchdog : si le scan WiFi reste bloqué > 60s sans réponse, on
+  // force la sortie de l'état "scanning". Sécurité en cas de futures
+  // régressions côté agent (réseau qui ne répond plus, etc.).
+  useEffect(() => {
+    if (!wifiScanning) return;
+    const watchdog = setTimeout(() => {
+      console.warn('⏱️ [WS] Watchdog: wifiScanning bloqué > 60s, reset forcé');
+      setWifiScanning(false);
+    }, 60000);
+    return () => clearTimeout(watchdog);
+  }, [wifiScanning]);
 
   return (
     <WebSocketContext.Provider value={{ 
@@ -367,6 +399,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       knownSsids,
       wifiConnecting,
       wifiConnectionResult,
+      wifiScanError,
       wifiForgetting,
       updateProgress,
       sendMessage, 
@@ -376,6 +409,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       connectWifi,
       forgetWifi,
       clearWifiConnectionResult,
+      clearWifiScanError,
       sendRaw,
       connect, 
       disconnect 

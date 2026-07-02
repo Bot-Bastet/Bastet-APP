@@ -112,6 +112,7 @@ Canal pour l'utilisateur (État du robot, télécommande).
   - `ai_state` : État actif des modules IA.
 - **`scan_wifi`** : Envoyé par l'App pour demander la recherche des réseaux à proximité.
 - **`wifi_list`** : Renvoyé par le robot avec les réseaux triés par force de signal décroissante.
+- **`wifi_list_error`** : Renvoyé par le robot quand le scan échoue (timeout, interface verrouillée par NetworkManager, aucun scanner disponible). Contient `error`, `interface`, `manager` (`NetworkManager` / `wpa_supplicant` / `none` / `unknown`), `known_ssids`, `current_ssid`. Garantit que le dashboard arrête son spinner même en cas d'échec.
 - **`camera_setup`** : Active ou désactive un flux caméra sur le robot (`camera`: 1 ou 2, `enable`: true/false).
 
 ---

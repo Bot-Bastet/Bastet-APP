@@ -103,10 +103,12 @@ export default function WifiScreen({ navigation }: any) {
     knownSsids,
     wifiConnecting,
     wifiConnectionResult,
+    wifiScanError,
     wifiForgetting,
     connectWifi,
     forgetWifi,
-    clearWifiConnectionResult
+    clearWifiConnectionResult,
+    clearWifiScanError
   } = useWebSocket();
 
   const [selectedNetwork, setSelectedNetwork] = useState<WifiNetwork | null>(null);
@@ -123,12 +125,12 @@ export default function WifiScreen({ navigation }: any) {
     if (wifiConnectionResult) {
       if (wifiConnectionResult.status === 'success') {
         Alert.alert(
-          "Connexion réussie", 
+          "Connexion réussie",
           wifiConnectionResult.message || "Le robot s'est connecté au réseau avec succès."
         );
       } else {
         Alert.alert(
-          "Échec de connexion", 
+          "Échec de connexion",
           wifiConnectionResult.message || "Une erreur est survenue lors de la connexion."
         );
       }
@@ -136,6 +138,19 @@ export default function WifiScreen({ navigation }: any) {
       sendWifiScan(); // Rafraîchir les réseaux
     }
   }, [wifiConnectionResult]);
+
+  // Erreur de scan WiFi (canal dédié distinct de wifiConnectionResult) :
+  // Affiche une alerte mais NE déclenche PAS de re-scan, pour éviter une
+  // boucle ping-pong si NetworkManager verrouille wlan0 en permanence.
+  useEffect(() => {
+    if (wifiScanError) {
+      Alert.alert(
+        "Scan WiFi indisponible",
+        `Le robot n'a pas pu scanner les réseaux WiFi.\n\n${wifiScanError.error}\n\nInterface : ${wifiScanError.interface}\nGestionnaire : ${wifiScanError.manager}\n\nCliquez sur « Actualiser » pour réessayer une fois le problème corrigé côté robot.`,
+        [{ text: 'OK', onPress: () => clearWifiScanError() }]
+      );
+    }
+  }, [wifiScanError]);
 
   const handleNetworkPress = (network: WifiNetwork) => {
     const isKnown = knownSsids.includes(network.ssid);
