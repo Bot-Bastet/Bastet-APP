@@ -55,9 +55,9 @@ export default function ChatScreen() {
         {isListening && <Radio color={theme.colors.danger} size={24} />}
       </View>
 
-      <KeyboardAvoidingView 
-        style={styles.keyboardView} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
@@ -68,6 +68,8 @@ export default function ChatScreen() {
           contentContainerStyle={styles.chatContainer}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         />
 
         <View style={styles.inputArea}>

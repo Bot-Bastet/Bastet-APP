@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -9,32 +9,21 @@ import { useWebSocket } from '../context/WebSocketContext';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 export default function MapScreen({ navigation }: any) {
-  const { bots } = useBots();
+  const { bot } = useBots();
   const { telemetry, connected, sendNavGoal } = useWebSocket();
-  const [activeBot, setActiveBot] = useState(bots[0]);
   const [currentCoord, setCurrentCoord] = useState({
-    latitude: activeBot.latitude,
-    longitude: activeBot.longitude,
+    latitude: bot.latitude,
+    longitude: bot.longitude,
   });
-
-  // Note: we remove the static simulation effect because the context handles bot movement globally!
-  
-  // When bots array updates (movement), ensure activeBot references the updated object
-  useEffect(() => {
-    const updatedActiveBot = bots.find(b => b.id === activeBot.id);
-    if (updatedActiveBot) {
-      setActiveBot(updatedActiveBot);
-    }
-  }, [bots]);
 
   return (
     <View style={styles.container}>
-      <MapView 
+      <MapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
         initialRegion={{
-          latitude: activeBot.latitude,
-          longitude: activeBot.longitude,
+          latitude: bot.latitude,
+          longitude: bot.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
@@ -42,43 +31,39 @@ export default function MapScreen({ navigation }: any) {
         onPress={(e) => {
           if (!connected || !telemetry?.pose) return;
           const { latitude, longitude } = e.nativeEvent.coordinate;
-          const dx = (latitude - activeBot.latitude) * 100;
-          const dy = (longitude - activeBot.longitude) * 100;
+          const dx = (latitude - bot.latitude) * 100;
+          const dy = (longitude - bot.longitude) * 100;
           sendNavGoal(telemetry.pose.x + dx, telemetry.pose.y + dy);
         }}
       >
-        {bots.map((bot) => (
-          <Marker 
-            key={bot.id} 
-            coordinate={{ latitude: bot.latitude, longitude: bot.longitude }}
-            onPress={() => setActiveBot(bot)}
-          >
-            <View style={[styles.markerContainer, activeBot.id === bot.id && { backgroundColor: theme.colors.primary + '40', borderColor: theme.colors.primary }]}>
-              <Target color={activeBot.id === bot.id ? theme.colors.primary : bot.colorTheme} size={24} />
-            </View>
-          </Marker>
-        ))}
+        <Marker
+          coordinate={{ latitude: bot.latitude, longitude: bot.longitude }}
+        >
+          <View style={[styles.markerContainer, { backgroundColor: theme.colors.primary + '40', borderColor: theme.colors.primary }]}>
+            <Target color={theme.colors.primary} size={24} />
+          </View>
+        </Marker>
       </MapView>
 
       <SafeAreaView style={styles.overlaySafeArea}>
         <Animated.View entering={FadeInUp.duration(600).springify()}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.overlayCard}
             activeOpacity={0.9}
-            onPress={() => navigation.navigate('HomeStack', { screen: 'BotDetail', params: { botId: activeBot.id } })}
+            onPress={() => navigation.navigate('HomeStack', { screen: 'HomeCenter' })}
           >
             <View style={styles.overlayHeader}>
-              <Text style={styles.droneName}>{activeBot.name}</Text>
+              <Text style={styles.droneName}>{bot.name}</Text>
               <ChevronRight color={theme.colors.textMuted} size={20} />
             </View>
             <View style={styles.statsRow}>
               <View>
                 <Text style={styles.statLabel}>VITESSE</Text>
-                <Text style={styles.statValue}>{activeBot.speed} km/h</Text>
+                <Text style={styles.statValue}>{bot.speed} km/h</Text>
               </View>
               <View>
                 <Text style={styles.statLabel}>BATTERIE</Text>
-                <Text style={styles.statValue}>{activeBot.battery}%</Text>
+                <Text style={styles.statValue}>{bot.battery}%</Text>
               </View>
             </View>
             {connected && telemetry?.pose && (

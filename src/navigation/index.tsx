@@ -8,7 +8,6 @@ import { Home, Map as MapIcon, Cpu, Settings, MessageSquare, Camera } from 'luci
 import { theme } from '../theme';
 
 import LoginScreen from '../screens/LoginScreen';
-import FleetScreen from '../screens/FleetScreen';
 import BotDetailScreen from '../screens/BotDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
 import MapScreen from '../screens/MapScreen';
@@ -65,9 +64,9 @@ function HomeTabNavigator() {
       />
       
       {/* Central Home Button (Action) */}
-      <Tab.Screen 
-        name="HomeCenter" 
-        component={FleetScreen} // Returns to garage
+      <Tab.Screen
+        name="HomeCenter"
+        component={BotDetailScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={styles.centralButtonContainer}>
@@ -97,13 +96,12 @@ function HomeTabNavigator() {
   );
 }
 
-export default function AppNavigation() {
+export default function AppNavigation({ onReady }: { onReady?: () => void }) {
   return (
-    <NavigationContainer>
+    <NavigationContainer onReady={onReady}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="HomeStack" component={HomeTabNavigator} />
-        <Stack.Screen name="BotDetail" component={BotDetailScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="RobotManualControl" component={RobotManualControlScreen} options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="GlobalPreferences" component={GlobalPreferencesScreen} />
         <Stack.Screen name="DriverProfile" component={DriverProfileScreen} />

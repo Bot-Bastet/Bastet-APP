@@ -60,7 +60,7 @@ const AIChip = ({ label, value }: { label: string; value: string }) => {
   );
 };
 
-export default function BotDetailScreen({ route, navigation }: any) {
+export default function BotDetailScreen({ navigation }: any) {
   const { robotState: bot, telemetry, sendCameraSetup, connected, sendJoystick, sendArduinoCmd } = useWebSocket();
   const [localStatus, setLocalStatus] = useState(bot?.status || 'Hors ligne');
   const [coreState, setCoreState] = useState<CoreState | null>(null);
@@ -126,16 +126,12 @@ export default function BotDetailScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Floating Top Bar (always clickable) */}
+      {/* Floating Top Bar */}
       <View style={styles.floatingTopBar} pointerEvents="box-none">
-         <SafeAreaView style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }} pointerEvents="box-none">
-           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.6}>
-             <ChevronLeft color={theme.colors.text} size={32} />
-           </TouchableOpacity>
-
+         <SafeAreaView style={{ flexDirection: 'row', justifyContent: 'flex-end', width: '100%', alignItems: 'center' }} pointerEvents="box-none">
            <View style={styles.statusBadge}>
-              <Animated.View style={[styles.statusDot, { backgroundColor: bot.colorTheme }, dotStyle]} />
-              <Text style={styles.statusText}>{localStatus.toUpperCase()}</Text>
+             <Animated.View style={[styles.statusDot, { backgroundColor: bot.colorTheme }, dotStyle]} />
+             <Text style={styles.statusText}>{localStatus.toUpperCase()}</Text>
            </View>
          </SafeAreaView>
       </View>

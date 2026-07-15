@@ -9,31 +9,21 @@ import { useWebSocket } from '../context/WebSocketContext';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 export default function MapScreen({ navigation }: any) {
-  const { bots } = useBots();
+  const { bot } = useBots();
   const { telemetry, connected, sendNavGoal } = useWebSocket();
-  const [activeBot, setActiveBot] = useState(bots[0]);
-  const [mapCenter, setMapCenter] = useState({ lat: bots[0].latitude, lng: bots[0].longitude });
-  
-  useEffect(() => {
-    const updatedActiveBot = bots.find(b => b.id === activeBot.id);
-    if (updatedActiveBot) {
-      setActiveBot(updatedActiveBot);
+  const [mapCenter, setMapCenter] = useState({ lat: bot.latitude, lng: bot.longitude });
 
-      const diffLat = Math.abs(updatedActiveBot.latitude - mapCenter.lat);
-      const diffLng = Math.abs(updatedActiveBot.longitude - mapCenter.lng);
-      if (diffLat > 0.0005 || diffLng > 0.0005) {
-        setMapCenter({ lat: updatedActiveBot.latitude, lng: updatedActiveBot.longitude });
-      }
+  useEffect(() => {
+    const diffLat = Math.abs(bot.latitude - mapCenter.lat);
+    const diffLng = Math.abs(bot.longitude - mapCenter.lng);
+    if (diffLat > 0.0005 || diffLng > 0.0005) {
+      setMapCenter({ lat: bot.latitude, lng: bot.longitude });
     }
-  }, [bots]);
-
-  useEffect(() => {
-    setMapCenter({ lat: activeBot.latitude, lng: activeBot.longitude });
-  }, [activeBot.id]);
+  }, [bot.latitude, bot.longitude]);
 
   return (
     <View style={styles.container}>
-      <WebView 
+      <WebView
         source={{ uri: `https://maps.google.com/maps?q=${mapCenter.lat},${mapCenter.lng}&z=15&output=embed` }}
         style={styles.map}
         scrollEnabled={false}
@@ -41,23 +31,23 @@ export default function MapScreen({ navigation }: any) {
 
       <SafeAreaView style={styles.overlaySafeArea}>
         <Animated.View entering={FadeInUp.duration(600).springify()}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.overlayCard}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('HomeStack', { screen: 'BotDetail', params: { botId: activeBot.id } })}
+            onPress={() => navigation.navigate('HomeStack', { screen: 'HomeCenter' })}
           >
             <View style={styles.overlayHeader}>
-              <Text style={styles.droneName}>{activeBot.name}</Text>
+              <Text style={styles.droneName}>{bot.name}</Text>
               <ChevronRight color={theme.colors.textMuted} size={20} />
             </View>
             <View style={styles.statsRow}>
               <View>
                 <Text style={styles.statLabel}>VITESSE</Text>
-                <Text style={styles.statValue}>{activeBot.speed} km/h</Text>
+                <Text style={styles.statValue}>{bot.speed} km/h</Text>
               </View>
               <View>
                 <Text style={styles.statLabel}>BATTERIE</Text>
-                <Text style={styles.statValue}>{activeBot.battery}%</Text>
+                <Text style={styles.statValue}>{bot.battery}%</Text>
               </View>
             </View>
             {connected && telemetry?.pose && (
