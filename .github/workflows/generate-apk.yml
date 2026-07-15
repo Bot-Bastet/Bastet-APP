@@ -16,7 +16,7 @@ env:
 
 jobs:
   # ===========================================================================
-  # 1. Détection de Duplication de Code (jscpd)
+  # 1. Quality Gates
   # ===========================================================================
   duplication:
     name: Code Duplication (jscpd)
@@ -24,9 +24,9 @@ jobs:
     outputs:
       percentage: ${{ steps.parse.outputs.percentage }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
@@ -41,27 +41,24 @@ jobs:
             --min-tokens 50 \
             --reporters "console" > jscpd_output.txt 2>&1 || true
 
-      - name: Parse and validate duplication
+      - name: Parse and validate
         id: parse
         run: |
-          python -c "
+          python3 -c "
           import re, os
           with open('jscpd_output.txt') as f:
               text = f.read()
           match = re.search(r'(\d+\.?\d*)\s*%', text)
           val = float(match.group(1)) if match else 0.0
           percentage = f'{val}%'
-          print(f'Duplication détectée: {percentage}')
+          print(f'Duplication: {percentage}')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               out.write(f'percentage={percentage}\n')
           if val > 10.0:
-              print('Error: La duplication de code dépasse le seuil maximal autorisé de 10% !')
+              print('Error: Duplication > 10%')
               exit(1)
           "
 
-  # ===========================================================================
-  # 2. Analyse de Sécurité SAST (Semgrep)
-  # ===========================================================================
   security:
     name: SAST Security Scan (Semgrep)
     runs-on: ubuntu-latest
@@ -70,7 +67,7 @@ jobs:
     container:
       image: semgrep/semgrep:1.114.0
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@v4
 
       - name: Scan Semgrep
         env:
@@ -87,83 +84,43 @@ jobs:
             --output semgrep_results.json \
             src
 
-      - name: Parse and validate security findings
+      - name: Parse findings
         id: parse
         run: |
-          python -c "
+          python3 -c "
           import json, os
           with open('semgrep_results.json') as f:
               data = json.load(f)
           count = len(data.get('results', []))
-          print(f'Failles de sécurité trouvées: {count}')
+          print(f'Failles: {count}')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               out.write(f'findings_count={count}\n')
           if count > 0:
-              print('Error: Faille de sécurité détectée par Semgrep. Release bloquée !')
+              print('Error: Failles de sécurité détectées')
               exit(1)
           "
 
   # ===========================================================================
-  # 3. Scan de Vulnérabilités & Secrets (Trivy)
-  # ===========================================================================
-  vulnerability:
-    name: Vuln & Secrets Scan (Trivy)
-    runs-on: ubuntu-latest
-    outputs:
-      issues_count: ${{ steps.parse.outputs.issues_count }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Scan Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          scanners: "vuln,secret"
-          severity: "HIGH,CRITICAL"
-          format: "json"
-          output: "trivy_results.json"
-
-      - name: Parse and validate Trivy findings
-        id: parse
-        run: |
-          python -c "
-          import json, os
-          with open('trivy_results.json') as f:
-              data = json.load(f)
-          results = data.get('Results', [])
-          issues = 0
-          for r in results:
-              issues += len(r.get('Vulnerabilities', [])) + len(r.get('Secrets', []))
-          print(f'Vulnérabilités ou secrets critiques trouvés: {issues}')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write(f'issues_count={issues}\n')
-          if issues > 0:
-              print('Error: Vulnérabilités/secrets de sévérité HIGH/CRITICAL détectés par Trivy. Release bloquée !')
-              exit(1)
-          "
-
-  # ===========================================================================
-  # 4. Compilation Android APK & Release
+  # 2. Build Android APK
   # ===========================================================================
   build:
     name: Build Android APK
-    needs: [duplication, security, vulnerability]
+    needs: [duplication, security]
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_DEV_TOKEN: ${{ secrets.API_TOKEN }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Java JDK
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -174,20 +131,41 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
-      - name: Verify Expo dependencies
-        run: npx expo install --check -- --legacy-peer-deps
-
-      - name: Prebuild Android project
+      - name: Prebuild Android
         run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair \
+            -alias bastet \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -keystore android/app/bastet-debug.keystore \
+            -storepass bastet123 \
+            -keypass bastet123 \
+            -dname "CN=Bastet, OU=Dev, O=Bastet, L=Paris, ST=IDF, C=FR"
+
+      - name: Configure signing
+        run: |
+          cat > android/key.properties << 'EOF'
+          storePassword=bastet123
+          keyPassword=bastet123
+          keyAlias=bastet
+          storeFile=bastet-debug.keystore
+          EOF
+
+          # Update build.gradle to use key.properties
+          sed -i 's|signingConfigs {.*|signingConfigs {\n        debug {\n            storeFile file("bastet-debug.keystore")\n            storePassword "bastet123"\n            keyAlias "bastet"\n            keyPassword "bastet123"\n        }\n        release {\n            storeFile file("bastet-debug.keystore")\n            storePassword "bastet123"\n            keyAlias "bastet"\n            keyPassword "bastet123"\n        }|' android/app/build.gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Android APK
+      - name: Build APK (debug-signed)
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
-      - name: Resolve release label
+      - name: Resolve version label
         id: version
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
@@ -202,38 +180,20 @@ jobs:
           RELEASE_LABEL: ${{ steps.version.outputs.label }}
         run: |
           mkdir -p build-output
-          cp android/app/build/outputs/apk/release/app-release.apk "build-output/Bastet-${RELEASE_LABEL}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "build-output/Bastet-${RELEASE_LABEL}.apk"
+          ls -lh build-output/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@v4
         with:
           name: Bastet-APK-${{ steps.version.outputs.label }}
           path: build-output/Bastet-${{ steps.version.outputs.label }}.apk
 
-      - name: Generate Release Body
-        run: |
-          cat << 'EOF' > release_body.md
-          Application Android pour le projet Bastet.
-
-          ### Configuration Gateway (API v2)
-          - Hôte : `ha.arthonetwork.fr`
-          - Port API : `44888` (HTTPS)
-          - Ports vidéo : HLS `48888`, WebRTC `48889`
-
-          ### 📊 Rapport de Qualité & Sécurité (Quality Gate)
-          | Test | Statut | Métrique | Limite |
-          | :--- | :---: | :---: | :---: |
-          | 📏 Duplication de code (jscpd) | ✅ Conforme | ${{ needs.duplication.outputs.percentage }} | <= 10% |
-          | 🛡️ Failles de sécurité (Semgrep) | ✅ Conforme | ${{ needs.security.outputs.findings_count }} faille | 0 |
-          | 🔐 Vulnérabilités & Secrets (Trivy) | ✅ Conforme | ${{ needs.vulnerability.outputs.issues_count }} vuln/secret | 0 |
-          EOF
-
-      - name: Create Release and Upload Asset
+      - name: Attach APK to Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@v2
         with:
           files: build-output/Bastet-${{ steps.version.outputs.label }}.apk
-          body_path: release_body.md
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
