@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   globalLoaderOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',

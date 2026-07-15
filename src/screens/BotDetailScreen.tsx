@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     ...theme.typography.small,
   },
   renderMockContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   manualControlFab: {
     position: 'absolute',

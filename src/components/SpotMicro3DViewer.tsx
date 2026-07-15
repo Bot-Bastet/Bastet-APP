@@ -267,14 +267,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(5,5,5,0.85)',
     gap: 12,
   },
   overlayTransparent: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
