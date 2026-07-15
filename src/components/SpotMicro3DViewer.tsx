@@ -91,7 +91,10 @@ export default function SpotMicro3DViewer({
   const postToViewer = useCallback((payload: object) => {
     const message = JSON.stringify(payload);
     if (Platform.OS === 'web') {
-      iframeRef.current?.contentWindow?.postMessage(message, '*');
+      // Origine cible explicite (pas de wildcard '*') : le viewer est un asset
+      // Expo servi depuis la même origine que l'app web. Évite la divulgation
+      // d'infos à une origine tierce (Semgrep wildcard-postmessage).
+      iframeRef.current?.contentWindow?.postMessage(message, window.location.origin);
       return;
     }
     webViewRef.current?.postMessage(message);
