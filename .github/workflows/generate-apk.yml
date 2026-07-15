@@ -175,7 +175,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Verify Expo dependencies
-        run: npx expo install --check
+        run: npx expo install --check -- --legacy-peer-deps
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --no-install --clean
