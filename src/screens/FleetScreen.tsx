@@ -10,7 +10,7 @@ const { width } = Dimensions.get('window');
 
 export default function FleetScreen({ navigation }: any) {
   const { robotState: bot, telemetry, connected, sendJoystick, sendArduinoCmd } = useWebSocket();
-  const sensors = telemetry?.sensors;
+  const sensors = (bot as any)?.sensors;
   const imu = telemetry?.imu;
 
   return (

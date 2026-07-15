@@ -97,8 +97,17 @@ function HomeTabNavigator() {
 }
 
 export default function AppNavigation({ initialRoute = 'Login', onReady }: { initialRoute?: string; onReady?: () => void }) {
+  const initialState = {
+    routes: [{ name: initialRoute }],
+    stale: false as const,
+    type: 'stack' as const,
+    key: 'root',
+    index: 0,
+    routeNames: ['Login', 'HomeStack'] as string[],
+  };
+
   return (
-    <NavigationContainer onReady={onReady} initialRouteName={initialRoute}>
+    <NavigationContainer onReady={onReady} initialState={initialState}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="HomeStack" component={HomeTabNavigator} />
