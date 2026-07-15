@@ -22,7 +22,7 @@ export default function VisionScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={StyleSheet.absoluteFillObject}>
+      <View style={StyleSheet.absoluteFill}>
         {Platform.OS === 'web' ? (
           <iframe
             src={videoUrl}

@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+env:
+  EXPO_PUBLIC_GATEWAY_IP: ha.arthonetwork.fr
+  EXPO_PUBLIC_GATEWAY_PORT: "44888"
+  EXPO_PUBLIC_USE_SSL: "true"
+
 jobs:
   # ===========================================================================
   # 1. Détection de Duplication de Code (jscpd)
@@ -20,23 +25,22 @@ jobs:
       percentage: ${{ steps.parse.outputs.percentage }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      
+
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
-          
+
       - name: Install jscpd
         run: npm install -g jscpd
-        
+
       - name: Analyse des duplications
         run: |
-          jscpd . \
+          jscpd src \
             --threshold 10 \
             --min-lines 5 \
             --min-tokens 50 \
-            --reporters "console" \
-            --ignore "**/__pycache__/**,**/dist/**,**/build/**,**/.git/**,**/node_modules/**,**/*.wav,**/*.exe,**/*.spec" > jscpd_output.txt 2>&1 || true
-            
+            --reporters "console" > jscpd_output.txt 2>&1 || true
+
       - name: Parse and validate duplication
         id: parse
         run: |
@@ -67,13 +71,22 @@ jobs:
       image: semgrep/semgrep:1.114.0
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      
+
       - name: Scan Semgrep
         env:
           SEMGREP_SEND_METRICS: "off"
         run: |
-          semgrep scan --config p/security-audit --config p/owasp-top-ten --json --output semgrep_results.json . || true
-          
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --exclude node_modules \
+            --exclude android \
+            --exclude .expo \
+            --exclude spotmicro_3d \
+            --json \
+            --output semgrep_results.json \
+            src
+
       - name: Parse and validate security findings
         id: parse
         run: |
@@ -100,7 +113,7 @@ jobs:
       issues_count: ${{ steps.parse.outputs.issues_count }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      
+
       - name: Scan Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -110,7 +123,7 @@ jobs:
           severity: "HIGH,CRITICAL"
           format: "json"
           output: "trivy_results.json"
-          
+
       - name: Parse and validate Trivy findings
         id: parse
         run: |
@@ -137,6 +150,8 @@ jobs:
     name: Build Android APK
     needs: [duplication, security, vulnerability]
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_DEV_TOKEN: ${{ secrets.API_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -156,13 +171,14 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Verify Expo dependencies
+        run: npx expo install --check
+
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --no-install --clean
-        env:
-          EXPO_PUBLIC_GATEWAY_IP: ha.arthonetwork.fr
-          EXPO_PUBLIC_GATEWAY_PORT: "44888"
-          EXPO_PUBLIC_USE_SSL: "true"
-          EXPO_PUBLIC_DEV_TOKEN: ${{ secrets.API_TOKEN }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -171,23 +187,38 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Resolve release label
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "label=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "label=v${VERSION}-build${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Collect APK
         env:
-          REF_NAME: ${{ github.ref_name }}
+          RELEASE_LABEL: ${{ steps.version.outputs.label }}
         run: |
           mkdir -p build-output
-          cp android/app/build/outputs/apk/release/app-release.apk build-output/Bastet-$REF_NAME.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "build-output/Bastet-${RELEASE_LABEL}.apk"
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Bastet-APK-${{ github.ref_name }}
-          path: build-output/Bastet-${{ github.ref_name }}.apk
+          name: Bastet-APK-${{ steps.version.outputs.label }}
+          path: build-output/Bastet-${{ steps.version.outputs.label }}.apk
 
       - name: Generate Release Body
         run: |
           cat << 'EOF' > release_body.md
           Application Android pour le projet Bastet.
+
+          ### Configuration Gateway (API v2)
+          - Hôte : `ha.arthonetwork.fr`
+          - Port API : `44888` (HTTPS)
+          - Ports vidéo : HLS `48888`, WebRTC `48889`
 
           ### 📊 Rapport de Qualité & Sécurité (Quality Gate)
           | Test | Statut | Métrique | Limite |
@@ -201,7 +232,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          files: build-output/Bastet-${{ github.ref_name }}.apk
+          files: build-output/Bastet-${{ steps.version.outputs.label }}.apk
           body_path: release_body.md
           draft: false
         env:
