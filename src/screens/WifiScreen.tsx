@@ -265,10 +265,19 @@ export default function WifiScreen({ navigation }: any) {
               <Text style={styles.sectionTitle}>
                 {wifiNetworks.length} RÉSEAU{wifiNetworks.length > 1 ? 'X' : ''} DÉTECTÉ{wifiNetworks.length > 1 ? 'S' : ''}
               </Text>
-              {wifiNetworks.map((network, index) => (
-                <WifiNetworkRow 
-                  key={`${network.ssid}-${index}`} 
-                  network={network} 
+              {[...wifiNetworks]
+                .sort((a, b) => {
+                  const aKnown = knownSsids.includes(a.ssid) ? 0 : 1;
+                  const bKnown = knownSsids.includes(b.ssid) ? 0 : 1;
+                  if (aKnown !== bKnown) return aKnown - bKnown;
+                  const aSig = a.signal < 0 ? 100 + a.signal : a.signal;
+                  const bSig = b.signal < 0 ? 100 + b.signal : b.signal;
+                  return bSig - aSig;
+                })
+                .map((network, index) => (
+                <WifiNetworkRow
+                  key={`${network.ssid}-${index}`}
+                  network={network}
                   index={index}
                   isKnown={knownSsids.includes(network.ssid)}
                   onPress={() => handleNetworkPress(network)}

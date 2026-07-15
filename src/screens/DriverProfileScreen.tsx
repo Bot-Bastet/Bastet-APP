@@ -5,7 +5,7 @@ import { ChevronLeft, Network, ScanFace, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import Animated, { FadeInLeft, FadeInDown } from 'react-native-reanimated';
-import { setIntranetCredentials } from '../api/intranet';
+import { setIntranetCredentials, getIntranetCredentials } from '../api/intranet';
 import { uploadFaces } from '../api/faces';
 import { theme } from '../theme';
 
@@ -14,6 +14,7 @@ export default function DriverProfileScreen({ navigation }: any) {
   const [mygesUser, setMygesUser] = useState('');
   const [mygesPass, setMygesPass] = useState('');
   const [loadingIntranet, setLoadingIntranet] = useState(false);
+  const [mygesRegistered, setMygesRegistered] = useState(false);
 
   // User Info
   const [userName, setUserName] = useState('Conducteur');
@@ -30,7 +31,8 @@ export default function DriverProfileScreen({ navigation }: any) {
         }
         if (userStr) {
           const user = JSON.parse(userStr);
-          setUserName(`${user.first_name} ${user.last_name}`);
+          const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.pseudo || user.email || 'Conducteur';
+          setUserName(fullName);
           if (user.is_admin) setUserRole('Administrateur / Conducteur Principal');
           else setUserRole('Conducteur');
         }
@@ -39,6 +41,23 @@ export default function DriverProfileScreen({ navigation }: any) {
       }
     };
     loadUser();
+  }, []);
+
+  useEffect(() => {
+    const loadMyGES = async () => {
+      try {
+        const data = await getIntranetCredentials();
+        if (data && Object.keys(data).length > 0) {
+          const firstUser = Object.keys(data)[0];
+          const creds = data[firstUser];
+          setMygesUser(creds.username || '');
+          setMygesRegistered(true);
+        }
+      } catch (e) {
+        // No credentials stored yet — that's fine
+      }
+    };
+    loadMyGES();
   }, []);
 
   // Faces
@@ -113,6 +132,11 @@ export default function DriverProfileScreen({ navigation }: any) {
 
         <Section title="IDENTIFIANTS INTRANET (MyGES)" icon={Network} delay={100}>
           <View style={styles.formContainer}>
+            {mygesRegistered && (
+              <View style={styles.registeredBadge}>
+                <Text style={styles.registeredText}>ENREGISTRÉ SUR LA GATEWAY</Text>
+              </View>
+            )}
             <Text style={styles.formNote}>Ces données sont chiffrées par la Gateway.</Text>
             <TextInput
               style={styles.input}
@@ -213,6 +237,22 @@ const styles = StyleSheet.create({
     ...theme.typography.small,
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.m,
+  },
+  registeredBadge: {
+    backgroundColor: 'rgba(0, 255, 157, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 157, 0.3)',
+    marginBottom: theme.spacing.m,
+    alignSelf: 'flex-start',
+  },
+  registeredText: {
+    ...theme.typography.small,
+    color: theme.colors.success,
+    fontWeight: '700',
+    fontSize: 10,
   },
   input: {
     backgroundColor: theme.colors.background,

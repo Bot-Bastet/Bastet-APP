@@ -264,31 +264,42 @@ export default function BotDetailScreen({ navigation }: any) {
           {/* ═══ CAMERA CONTROLS (Section 1 — camera_setup) ═══ */}
           <Text style={styles.sectionTitle}>C A M É R A S</Text>
           <View style={styles.cameraCard}>
-            <View style={styles.cameraRow}>
-              <View style={styles.cameraRowLeft}>
-                <Video color={coreState?.active_streams?.['1'] ? theme.colors.success : theme.colors.textMuted} size={22} />
-                <Text style={styles.cameraLabel}>Caméra 1</Text>
+            {sensors?.cam1_connected && (
+              <>
+                <View style={styles.cameraRow}>
+                  <View style={styles.cameraRowLeft}>
+                    <Video color={coreState?.active_streams?.['1'] ? theme.colors.success : theme.colors.textMuted} size={22} />
+                    <Text style={styles.cameraLabel}>Caméra 1</Text>
+                  </View>
+                  <Switch
+                    value={coreState?.active_streams?.['1'] || false}
+                    onValueChange={(val) => sendCameraSetup(1, val)}
+                    trackColor={{ false: theme.colors.surface, true: theme.colors.success + '60' }}
+                    thumbColor={coreState?.active_streams?.['1'] ? theme.colors.success : '#888'}
+                  />
+                </View>
+                {sensors?.cam2_connected && <View style={styles.cameraDivider} />}
+              </>
+            )}
+            {sensors?.cam2_connected && (
+              <View style={styles.cameraRow}>
+                <View style={styles.cameraRowLeft}>
+                  <Video color={coreState?.active_streams?.['2'] ? theme.colors.success : theme.colors.textMuted} size={22} />
+                  <Text style={styles.cameraLabel}>Caméra 2</Text>
+                </View>
+                <Switch
+                  value={coreState?.active_streams?.['2'] || false}
+                  onValueChange={(val) => sendCameraSetup(2, val)}
+                  trackColor={{ false: theme.colors.surface, true: theme.colors.success + '60' }}
+                  thumbColor={coreState?.active_streams?.['2'] ? theme.colors.success : '#888'}
+                />
               </View>
-              <Switch
-                value={coreState?.active_streams?.['1'] || false}
-                onValueChange={(val) => sendCameraSetup(1, val)}
-                trackColor={{ false: theme.colors.surface, true: theme.colors.success + '60' }}
-                thumbColor={coreState?.active_streams?.['1'] ? theme.colors.success : '#888'}
-              />
-            </View>
-            <View style={styles.cameraDivider} />
-            <View style={styles.cameraRow}>
-              <View style={styles.cameraRowLeft}>
-                <Video color={coreState?.active_streams?.['2'] ? theme.colors.success : theme.colors.textMuted} size={22} />
-                <Text style={styles.cameraLabel}>Caméra 2</Text>
+            )}
+            {!sensors?.cam1_connected && !sensors?.cam2_connected && (
+              <View style={styles.cameraRow}>
+                <Text style={[styles.cameraLabel, { color: theme.colors.textMuted }]}>Aucune caméra détectée</Text>
               </View>
-              <Switch
-                value={coreState?.active_streams?.['2'] || false}
-                onValueChange={(val) => sendCameraSetup(2, val)}
-                trackColor={{ false: theme.colors.surface, true: theme.colors.success + '60' }}
-                thumbColor={coreState?.active_streams?.['2'] ? theme.colors.success : '#888'}
-              />
-            </View>
+            )}
           </View>
 
           {/* ═══ CONNECTIVITY STATUS ═══ */}
@@ -391,7 +402,7 @@ export default function BotDetailScreen({ navigation }: any) {
           </View>
 
           {/* ═══ ROS TOPICS FROM TELEMETRY ═══ */}
-          {telemetry?.topics && telemetry.topics.length > 0 && (
+          {telemetry?.topics && telemetry.topics.length > 3 && (
             <>
               <Text style={styles.sectionTitle}>R O S   T O P I C S</Text>
               {telemetry.topics.slice(0, 8).map((topic, i) => (
