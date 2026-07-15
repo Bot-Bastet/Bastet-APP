@@ -6,7 +6,7 @@ import { ChevronLeft, Trash2, UserCircle, Camera, RefreshCw } from 'lucide-react
 import { theme } from '../theme';
 import { FaceEntry } from '../types';
 import { getFaces, deleteFace, getFaceImageUrl } from '../api/faces';
-import { getBaseUrl } from '../api/client';
+import { getBaseUrl, getApiToken } from '../api/client';
 
 // ═══════════════════════════════════════════════════════════════
 // FacesManagementScreen — Section 4 DocsGateway
@@ -18,6 +18,8 @@ export default function FacesManagementScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
+  const [imageUris, setImageUris] = useState<Record<string, string>>({});
+  const [apiToken, setApiToken] = useState('');
 
   const fetchFaces = async () => {
     setLoading(true);
@@ -34,7 +36,21 @@ export default function FacesManagementScreen({ navigation }: any) {
   const fetchBaseUrl = async () => {
     const url = await getBaseUrl();
     setBaseUrl(url);
+    const token = await getApiToken();
+    setApiToken(token || '');
   };
+
+  useEffect(() => {
+    if (!baseUrl || faces.length === 0) return;
+    const loadUris = async () => {
+      const uris: Record<string, string> = {};
+      for (const face of faces) {
+        uris[face.face_id] = await getFaceImageUrl(face.face_id, baseUrl);
+      }
+      setImageUris(uris);
+    };
+    loadUris();
+  }, [baseUrl, faces]);
 
   useEffect(() => {
     fetchFaces();
@@ -66,11 +82,7 @@ export default function FacesManagementScreen({ navigation }: any) {
     );
   };
 
-  const getImageUri = (faceId: string): string => {
-    if (!baseUrl) return '';
-    const token = process.env.EXPO_PUBLIC_DEV_TOKEN || '';
-    return `${baseUrl}/faces/${faceId}/image?token=${token}`;
-  };
+  const getImageUri = (faceId: string): string => imageUris[faceId] || '';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -128,9 +140,9 @@ export default function FacesManagementScreen({ navigation }: any) {
                 <View style={styles.faceLeft}>
                   {baseUrl ? (
                     <Image
-                      source={{ 
+                      source={{
                         uri: getImageUri(face.face_id),
-                        headers: { 'X-API-Token': process.env.EXPO_PUBLIC_DEV_TOKEN || '' }
+                        headers: apiToken ? { 'X-API-Token': apiToken } : undefined,
                       }}
                       style={styles.faceImage}
                       defaultSource={require('../../assets/icon.png')}

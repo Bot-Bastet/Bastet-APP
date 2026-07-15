@@ -19,6 +19,7 @@ import DriverProfileScreen from '../screens/DriverProfileScreen';
 import SystemUpdateScreen from '../screens/SystemUpdateScreen';
 import WifiScreen from '../screens/WifiScreen';
 import FacesManagementScreen from '../screens/FacesManagementScreen';
+import RobotManualControlScreen from '../screens/RobotManualControlScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -103,6 +104,7 @@ export default function AppNavigation() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="HomeStack" component={HomeTabNavigator} />
         <Stack.Screen name="BotDetail" component={BotDetailScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="RobotManualControl" component={RobotManualControlScreen} options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="GlobalPreferences" component={GlobalPreferencesScreen} />
         <Stack.Screen name="DriverProfile" component={DriverProfileScreen} />
         <Stack.Screen name="SystemUpdate" component={SystemUpdateScreen} />

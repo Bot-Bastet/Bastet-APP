@@ -68,3 +68,15 @@ export const setArduinoUpdateProgress = async (data: Partial<UpdateProgress>): P
   const response = await apiClient.post('/system/update/arduino/progress', data);
   return response.data;
 };
+
+/** POST /system/update/gateway/rollback — Rollback Gateway vers une version */
+export const rollbackGateway = async (version: string): Promise<any> => {
+  const response = await apiClient.post('/system/update/gateway/rollback', { version });
+  return response.data;
+};
+
+/** POST /system/update/robot/rollback — Rollback Robot vers une version */
+export const rollbackRobot = async (version: string): Promise<any> => {
+  const response = await apiClient.post('/system/update/robot/rollback', { version });
+  return response.data;
+};

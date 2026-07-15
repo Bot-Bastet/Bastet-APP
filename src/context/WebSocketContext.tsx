@@ -1,13 +1,17 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import { DEFAULT_GATEWAY_IP } from '../api/client';
-import { TelemetryDiagnostics, WifiNetwork, CameraSetupPayload, UpdateProgress } from '../types';
+import { DEFAULT_GATEWAY_IP, GATEWAY_API_PORT, getApiToken } from '../api/client';
+import {
+  TelemetryDiagnostics,
+  WifiNetwork,
+  UpdateProgress,
+  CalibrationState,
+  ArduinoCmdType,
+} from '../types';
 
 // ═══════════════════════════════════════════════════════════════
 // WebSocket Context — Bastet CORE Gateway
-// Handles: chat, state, telemetry_diagnostics, wifi_list,
-//          scan_wifi, camera_setup
+// Handles: chat, state, telemetry_diagnostics, wifi (legacy),
+//          cmd_vel, request_camera, arduino_cmd, calibration
 // ═══════════════════════════════════════════════════════════════
 
 interface Message {
@@ -26,6 +30,7 @@ interface RobotState {
   longitude: number;
   speed: number;
   colorTheme: string;
+  [key: string]: unknown;
 }
 
 interface WSContextData {
@@ -37,19 +42,29 @@ interface WSContextData {
   wifiScanning: boolean;
   knownSsids: string[];
   wifiConnecting: boolean;
-  wifiConnectionResult: { status: 'success' | 'error', message: string } | null;
+  wifiConnectionResult: { status: 'success' | 'error'; message: string } | null;
   wifiScanError: { error: string; interface: string; manager: string } | null;
   wifiForgetting: boolean;
   updateProgress: { gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null };
+  calibrationState: CalibrationState;
   sendMessage: (text: string) => void;
+  sendCmdVel: (linear: number, angular: number) => void;
   sendJoystick: (x: number, y: number) => void;
   sendWifiScan: () => void;
+  requestCamera: (camera: 1 | 2, vSlam?: boolean) => void;
+  releaseCamera: (camera: 1 | 2) => void;
+  stopCamera: (camera: 1 | 2) => void;
   sendCameraSetup: (camera: 1 | 2, enable: boolean) => void;
   connectWifi: (ssid: string, password?: string) => void;
   forgetWifi: (ssid: string) => void;
+  sendNavGoal: (x: number, y: number) => void;
+  sendArduinoCmd: (cmd: ArduinoCmdType, index?: number, angle?: number) => void;
+  sendManualJoints: (angles: number[]) => void;
+  runMonoCalib: (params: { camera: 1 | 2; chessboard_cols: number; chessboard_rows: number; square_size_mm: number; timeout_seconds?: number }) => void;
+  runStereoCalib: (params: { chessboard_cols: number; chessboard_rows: number; square_size_mm: number; timeout_seconds?: number }) => void;
   clearWifiConnectionResult: () => void;
   clearWifiScanError: () => void;
-  sendRaw: (data: any) => void;
+  sendRaw: (data: unknown) => void;
   connect: () => void;
   disconnect: () => void;
 }
@@ -65,6 +80,16 @@ const defaultRobotState: RobotState = {
   colorTheme: '#D5001C',
 };
 
+const defaultCalibrationState: CalibrationState = {
+  active: false,
+  mode: null,
+  camera: null,
+  progress: 0,
+  message: '',
+  lastResult: null,
+  lastFrame: null,
+};
+
 const WebSocketContext = createContext<WSContextData>({} as WSContextData);
 
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -78,12 +103,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [wifiScanning, setWifiScanning] = useState(false);
   const [knownSsids, setKnownSsids] = useState<string[]>([]);
   const [wifiConnecting, setWifiConnecting] = useState(false);
-  const [wifiConnectionResult, setWifiConnectionResult] = useState<{ status: 'success' | 'error', message: string } | null>(null);
+  const [wifiConnectionResult, setWifiConnectionResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
   const [wifiScanError, setWifiScanError] = useState<{ error: string; interface: string; manager: string } | null>(null);
   const [wifiForgetting, setWifiForgetting] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<{ gateway: UpdateProgress | null; robot: UpdateProgress | null; arduino: UpdateProgress | null }>({
-    gateway: null, robot: null, arduino: null
+    gateway: null, robot: null, arduino: null,
   });
+  const [calibrationState, setCalibrationState] = useState<CalibrationState>(defaultCalibrationState);
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -91,32 +117,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (ws.current) return;
 
     try {
-      let token = process.env.EXPO_PUBLIC_DEV_TOKEN || null;
-
-      if (!token) {
-        if (Platform.OS !== 'web') {
-          token = await SecureStore.getItemAsync('jwt_token');
-        } else {
-          token = localStorage.getItem('jwt_token');
-        }
-      }
-
-      if (!token) return; // Wait for login
+      const token = await getApiToken();
+      if (!token) return;
 
       const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
       const protocol = isSecure ? 'wss' : 'ws';
+      const url = `${protocol}://${DEFAULT_GATEWAY_IP}:${GATEWAY_API_PORT}/ws/app?token=${encodeURIComponent(token)}`;
 
-      // Note: React Native WebSocket supports headers, but Web doesn't.
-      // Using query param for token is safer across platforms if Gateway supports it.
-      const url = `${protocol}://${DEFAULT_GATEWAY_IP}:44888/ws/app?token=${token}`;
-      
       const socket = new WebSocket(url);
 
       socket.onopen = () => {
         setConnected(true);
-        console.log(`\n🟢 [WS] ════════════════════════════════════`);
-        console.log(`🟢 [WS] CONNECTÉ à ${url}`);
-        console.log(`🟢 [WS] ════════════════════════════════════\n`);
+        console.log(`\n🟢 [WS] CONNECTÉ à ${url}\n`);
       };
 
       socket.onmessage = (event) => {
@@ -124,59 +136,47 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const data = JSON.parse(event.data);
           const dataStr = JSON.stringify(data);
           const truncated = dataStr.length > 500 ? dataStr.substring(0, 500) + '...' : dataStr;
-          
+
           console.log(`📨 [WS ← ${data.type || 'UNKNOWN'}] ${truncated}`);
-          
+
           switch (data.type) {
-            // ─── État général du robot ─────────────────────
             case 'state':
-              console.log(`   ↳ [WS] 🤖 State update:`, JSON.stringify(data.payload || data).substring(0, 300));
               setRobotState(prev => ({ ...prev, ...(data.payload || data) }));
               break;
 
-            // ─── Chat bidirectionnel ──────────────────────
             case 'chat': {
-              const textContent = data.payload?.text || data.text;
-              const isAiContent = data.payload?.isAi !== undefined ? data.payload.isAi : (data.isAi !== false);
-              console.log(`   ↳ [WS] 💬 Chat: [${isAiContent ? 'AI' : 'USER'}] "${textContent}"`);
-              
+              const textContent = data.text || data.payload?.text;
+              const isAiContent = data.payload?.isAi !== undefined
+                ? data.payload.isAi
+                : (data.isAi !== undefined ? data.isAi : true);
               if (textContent) {
-                const newMsg: Message = {
+                setMessages(prev => [...prev, {
                   id: Date.now().toString(),
                   text: textContent,
                   isAi: isAiContent,
                   timestamp: new Date(),
-                };
-                setMessages(prev => [...prev, newMsg]);
+                }]);
               }
               break;
             }
 
-            // ─── Télémétrie complète (Section 1 — DocsGateway) ─
             case 'telemetry_diagnostics':
-              console.log(`   ↳ [WS] 📊 Telemetry: joints=${data.payload?.joints?.length || '?'}, imu=${JSON.stringify(data.payload?.imu || {})}`);
               setTelemetry(data.payload || data);
               break;
 
-            // ─── Liste WiFi reçue du robot ────────────────
             case 'wifi_list': {
               const networks = data.payload?.networks || data.networks || [];
               const ssids = data.payload?.known_ssids || data.known_ssids || [];
-              console.log(`   ↳ [WS] 📶 WiFi: ${networks.length} réseaux reçus, ${ssids.length} connus`);
               setWifiNetworks(networks);
               setKnownSsids(ssids);
               setWifiScanning(false);
               break;
             }
 
-            // ─── Échec du scan WiFi (agent bloqué ou interface verrouillée) ─
-            // Canal DEDIE pour ne PAS déclencher l'auto-rescan conditionné par
-            // wifiConnectionResult dans WifiScreen (évite la boucle ping-pong).
             case 'wifi_list_error': {
               const errMsg = data.payload?.error || data.error || 'Erreur inconnue';
               const iface = data.payload?.interface || data.interface || 'wlan0';
               const mgr = data.payload?.manager || data.manager || 'inconnu';
-              console.warn(`   ↳ [WS] 📶⚠️ Scan WiFi échoué: ${errMsg} (iface=${iface}, mgr=${mgr})`);
               setWifiScanning(false);
               setWifiScanError({ error: errMsg, interface: iface, manager: mgr });
               break;
@@ -185,52 +185,97 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             case 'wifi_connect_result': {
               const status = data.payload?.status || data.status;
               const msg = data.payload?.message || data.message || '';
-              console.log(`   ↳ [WS] 📶 Connection WiFi résultat: ${status} - ${msg}`);
               setWifiConnecting(false);
               setWifiConnectionResult({ status, message: msg });
               break;
             }
 
             case 'wifi_forget_result': {
-              const status = data.payload?.status || data.status;
-              const msg = data.payload?.message || data.message || '';
-              console.log(`   ↳ [WS] 📶 Oubli WiFi résultat: ${status} - ${msg}`);
               setWifiForgetting(false);
-              // Trigger a rescan to update known lists
               ws.current?.send(JSON.stringify({ type: 'scan_wifi' }));
               break;
             }
 
-            // ─── Statut des flux caméra ───────────────────
             case 'stream_status': {
-              const cam = data.camera || data.payload?.camera;
+              const cam = data.camera ?? data.payload?.camera;
               const active = data.active ?? data.payload?.active;
-              console.log(`   ↳ [WS] 📹 Stream: cam${cam} = ${active ? 'ACTIVE' : 'INACTIVE'}`);
               if (cam !== undefined && active !== undefined) {
                 setRobotState(prev => ({ ...prev, [`cam${cam}_active`]: active }));
               }
               break;
             }
-            
-            case 'keep_stream_status': {
-              const cam = data.camera || data.payload?.camera;
-              const keep = data.keep ?? data.payload?.keep;
-              console.log(`   ↳ [WS] 📹 Keep Stream: cam${cam} = ${keep ? 'KEEP ACTIVE' : 'LET DIE'}`);
-              break;
-            }
 
-            // ─── Progression des mises à jour (Section 7) ─
+            case 'keep_stream_status':
+              break;
+
             case 'gateway_update_progress':
-              console.log(`   ↳ [WS] ⬇️ Gateway Update: ${data.status || data.payload?.status} ${data.percent || data.payload?.percent}%`);
               setUpdateProgress(prev => ({ ...prev, gateway: data.payload || data }));
               break;
             case 'robot_update_progress':
-              console.log(`   ↳ [WS] ⬇️ Robot Update: ${data.status || data.payload?.status} ${data.percent || data.payload?.percent}%`);
               setUpdateProgress(prev => ({ ...prev, robot: data.payload || data }));
               break;
             case 'arduino_update_progress':
-              console.log(`   ↳ [WS] ⬇️ Arduino Update: ${data.status || data.payload?.status} ${data.percent || data.payload?.percent}%`);
               setUpdateProgress(prev => ({ ...prev, arduino: data.payload || data }));
+              break;
+
+            case 'mono_calib_frame':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: true,
+                mode: 'mono',
+                camera: data.camera ?? data.payload?.camera ?? null,
+                lastFrame: data.image || data.payload?.image || null,
+              }));
+              break;
+
+            case 'mono_calib_progress':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: true,
+                mode: 'mono',
+                camera: data.camera ?? data.payload?.camera ?? prev.camera,
+                progress: data.progress ?? data.payload?.progress ?? 0,
+                message: data.message || data.payload?.message || '',
+              }));
+              break;
+
+            case 'mono_calib_result':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: false,
+                progress: 100,
+                message: data.message || data.payload?.message || '',
+                lastResult: data.payload || data,
+              }));
+              break;
+
+            case 'stereo_calib_frame':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: true,
+                mode: 'stereo',
+                lastFrame: data.image || data.payload?.image || null,
+              }));
+              break;
+
+            case 'stereo_calib_progress':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: true,
+                mode: 'stereo',
+                progress: data.progress ?? data.payload?.progress ?? 0,
+                message: data.message || data.payload?.message || '',
+              }));
+              break;
+
+            case 'stereo_calib_result':
+              setCalibrationState(prev => ({
+                ...prev,
+                active: false,
+                progress: 100,
+                message: data.message || data.payload?.message || '',
+                lastResult: data.payload || data,
+              }));
               break;
 
             default:
@@ -242,18 +287,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       };
 
-      socket.onclose = (e) => {
+      socket.onclose = () => {
         setConnected(false);
         ws.current = null;
-        console.log(`\n🔴 [WS] ════════════════════════════════════`);
-        console.log(`🔴 [WS] DÉCONNECTÉ — code: ${(e as any)?.code || '?'}, reason: ${(e as any)?.reason || 'none'}`);
-        console.log(`🔴 [WS] Reconnexion dans 5s...`);
-        console.log(`🔴 [WS] ════════════════════════════════════\n`);
-        // Auto-reconnect after 5 seconds
-        reconnectTimer.current = setTimeout(() => {
-          console.log(`🔄 [WS] Tentative de reconnexion...`);
-          connect();
-        }, 5000);
+        reconnectTimer.current = setTimeout(() => connect(), 5000);
       };
 
       socket.onerror = (e) => {
@@ -275,124 +312,132 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ws.current.close();
       ws.current = null;
     }
+    setConnected(false);
   };
 
-  const sendRaw = useCallback((data: any) => {
+  const sendRaw = useCallback((data: unknown) => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] RAW:`, JSON.stringify(data));
       ws.current.send(JSON.stringify(data));
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT SEND RAW, NOT CONNECTED:`, JSON.stringify(data));
     }
   }, [connected]);
 
   const sendMessage = useCallback((text: string) => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] CHAT: "${text}"`);
-      ws.current.send(JSON.stringify({ type: 'chat', payload: { text } }));
+      ws.current.send(JSON.stringify({ type: 'chat', text }));
       setMessages(prev => [...prev, { id: Date.now().toString(), text, isAi: false, timestamp: new Date() }]);
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT SEND CHAT, NOT CONNECTED: "${text}"`);
+    }
+  }, [connected]);
+
+  const sendCmdVel = useCallback((linear: number, angular: number) => {
+    if (ws.current && connected) {
+      ws.current.send(JSON.stringify({ type: 'cmd_vel', linear, angular }));
     }
   }, [connected]);
 
   const sendJoystick = useCallback((x: number, y: number) => {
-    if (ws.current && connected) {
-      console.log(`📤 [WS SEND] JOYSTICK: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
-      ws.current.send(JSON.stringify({ type: 'joystick', payload: { x, y } }));
-    }
-  }, [connected]);
+    sendCmdVel(-y * 0.2, -x * 0.5);
+  }, [sendCmdVel]);
 
-  /**
-   * Envoie une demande de scan WiFi au robot (Section 1 — DocsGateway)
-   * Le robot répondra avec un message `wifi_list`
-   */
   const sendWifiScan = useCallback(() => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] SCAN_WIFI`);
       setWifiScanning(true);
       setWifiNetworks([]);
       ws.current.send(JSON.stringify({ type: 'scan_wifi' }));
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT SEND SCAN_WIFI, NOT CONNECTED`);
     }
   }, [connected]);
 
-  /**
-   * Active ou désactive un flux caméra sur le robot (Section 1 — DocsGateway)
-   * camera: 1 ou 2, enable: true/false
-   */
-  const sendCameraSetup = useCallback((camera: 1 | 2, enable: boolean) => {
+  const requestCamera = useCallback((camera: 1 | 2, vSlam = false) => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] CAMERA_SETUP: cam${camera} = ${enable ? 'ON' : 'OFF'}`);
-      ws.current.send(JSON.stringify({ 
-        type: 'camera_setup', 
-        payload: { camera, enable } 
-      }));
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT SEND CAMERA_SETUP, NOT CONNECTED`);
+      ws.current.send(JSON.stringify({ type: 'request_camera', camera, v_slam: vSlam }));
     }
   }, [connected]);
+
+  const releaseCamera = useCallback((camera: 1 | 2) => {
+    if (ws.current && connected) {
+      ws.current.send(JSON.stringify({ type: 'release_camera', camera }));
+    }
+  }, [connected]);
+
+  const stopCamera = useCallback((camera: 1 | 2) => {
+    if (ws.current && connected) {
+      ws.current.send(JSON.stringify({ type: 'stop_camera', camera }));
+    }
+  }, [connected]);
+
+  const sendCameraSetup = useCallback((camera: 1 | 2, enable: boolean) => {
+    if (enable) requestCamera(camera);
+    else releaseCamera(camera);
+  }, [requestCamera, releaseCamera]);
 
   const connectWifi = useCallback((ssid: string, password?: string) => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] CONNECT_WIFI: ${ssid}`);
       setWifiConnecting(true);
       setWifiConnectionResult(null);
-      ws.current.send(JSON.stringify({ 
-        type: 'connect_wifi', 
-        ssid, 
-        password 
-      }));
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT CONNECT_WIFI, NOT CONNECTED`);
+      ws.current.send(JSON.stringify({ type: 'connect_wifi', ssid, password }));
     }
   }, [connected]);
 
   const forgetWifi = useCallback((ssid: string) => {
     if (ws.current && connected) {
-      console.log(`📤 [WS SEND] FORGET_WIFI: ${ssid}`);
       setWifiForgetting(true);
-      ws.current.send(JSON.stringify({ 
-        type: 'forget_wifi', 
-        ssid 
-      }));
-    } else {
-      console.warn(`⚠️ [WS SEND] CANNOT FORGET_WIFI, NOT CONNECTED`);
+      ws.current.send(JSON.stringify({ type: 'forget_wifi', ssid }));
     }
   }, [connected]);
 
-  const clearWifiConnectionResult = useCallback(() => {
-    setWifiConnectionResult(null);
-  }, []);
+  const sendNavGoal = useCallback((x: number, y: number) => {
+    if (ws.current && connected) {
+      ws.current.send(JSON.stringify({ type: 'nav_goal', x, y }));
+    }
+  }, [connected]);
 
-  const clearWifiScanError = useCallback(() => {
-    setWifiScanError(null);
-  }, []);
+  const sendArduinoCmd = useCallback((cmd: ArduinoCmdType, index?: number, angle?: number) => {
+    if (ws.current && connected) {
+      const payload: Record<string, unknown> = { type: 'arduino_cmd', cmd };
+      if (index !== undefined) payload.index = index;
+      if (angle !== undefined) payload.angle = angle;
+      ws.current.send(JSON.stringify(payload));
+    }
+  }, [connected]);
+
+  const sendManualJoints = useCallback((angles: number[]) => {
+    if (ws.current && connected) {
+      ws.current.send(JSON.stringify({ type: 'manual_joint_control', angles }));
+    }
+  }, [connected]);
+
+  const runMonoCalib = useCallback((params: { camera: 1 | 2; chessboard_cols: number; chessboard_rows: number; square_size_mm: number; timeout_seconds?: number }) => {
+    if (ws.current && connected) {
+      setCalibrationState({ ...defaultCalibrationState, active: true, mode: 'mono', camera: params.camera });
+      ws.current.send(JSON.stringify({ type: 'run_mono_calib', ...params }));
+    }
+  }, [connected]);
+
+  const runStereoCalib = useCallback((params: { chessboard_cols: number; chessboard_rows: number; square_size_mm: number; timeout_seconds?: number }) => {
+    if (ws.current && connected) {
+      setCalibrationState({ ...defaultCalibrationState, active: true, mode: 'stereo' });
+      ws.current.send(JSON.stringify({ type: 'run_stereo_calib', ...params }));
+    }
+  }, [connected]);
+
+  const clearWifiConnectionResult = useCallback(() => setWifiConnectionResult(null), []);
+  const clearWifiScanError = useCallback(() => setWifiScanError(null), []);
 
   useEffect(() => {
-    // Attempt initial connect if token exists
     connect();
     return () => disconnect();
   }, []);
 
-  // ─── Watchdog : si le scan WiFi reste bloqué > 60s sans réponse, on
-  // force la sortie de l'état "scanning". Sécurité en cas de futures
-  // régressions côté agent (réseau qui ne répond plus, etc.).
   useEffect(() => {
     if (!wifiScanning) return;
-    const watchdog = setTimeout(() => {
-      console.warn('⏱️ [WS] Watchdog: wifiScanning bloqué > 60s, reset forcé');
-      setWifiScanning(false);
-    }, 60000);
+    const watchdog = setTimeout(() => setWifiScanning(false), 60000);
     return () => clearTimeout(watchdog);
   }, [wifiScanning]);
 
   return (
-    <WebSocketContext.Provider value={{ 
-      connected, 
-      robotState, 
-      messages, 
+    <WebSocketContext.Provider value={{
+      connected,
+      robotState,
+      messages,
       telemetry,
       wifiNetworks,
       wifiScanning,
@@ -402,17 +447,27 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       wifiScanError,
       wifiForgetting,
       updateProgress,
-      sendMessage, 
+      calibrationState,
+      sendMessage,
+      sendCmdVel,
       sendJoystick,
       sendWifiScan,
+      requestCamera,
+      releaseCamera,
+      stopCamera,
       sendCameraSetup,
       connectWifi,
       forgetWifi,
+      sendNavGoal,
+      sendArduinoCmd,
+      sendManualJoints,
+      runMonoCalib,
+      runStereoCalib,
       clearWifiConnectionResult,
       clearWifiScanError,
       sendRaw,
-      connect, 
-      disconnect 
+      connect,
+      disconnect,
     }}>
       {children}
     </WebSocketContext.Provider>

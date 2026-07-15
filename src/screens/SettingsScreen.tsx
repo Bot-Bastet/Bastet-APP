@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Power, Settings, Shield, User, Bell, ChevronRight, HardDrive, Wifi, ScanFace, Download } from 'lucide-react-native';
 import { theme } from '../theme';
+import { clearAuthSession } from '../api/auth';
+import { useWebSocket } from '../context/WebSocketContext';
 
 const SettingRow = ({ icon: Icon, title, subtitle, hasSwitch, value, onValueChange, onPress, iconColor }: any) => (
   <TouchableOpacity 
@@ -35,10 +37,11 @@ export default function SettingsScreen({ navigation }: any) {
   const [bioAuth, setBioAuth] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const { disconnect } = useWebSocket();
 
-
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    disconnect();
+    await clearAuthSession();
     navigation.replace('Login');
   };
 

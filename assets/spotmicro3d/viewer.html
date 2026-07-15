@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpotMicro 3D — Bastet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#050505; --card:rgba(18,18,18,0.92); --border:rgba(0,255,157,0.18);
+            --primary:#00FF9D; --accent:#00E5FF; --success:#00FF9D;
+            --danger:#FF3366; --text:#f4f4f5; --sub:#A0A0A0;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;user-select:none}
+        body,html{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Outfit',sans-serif;color:var(--text)}
+        #cv{width:100%;height:100%;position:absolute;top:0;left:0;z-index:1}
+        .panel{position:absolute;z-index:10;background:var(--card);backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:18px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+
+        #hdr{top:14px;left:14px;right:14px;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.35rem;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;gap:10px}
+        .logo::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+        .hdr-r{display:flex;align-items:center;gap:12px}
+        .pill{display:flex;align-items:center;gap:7px;font-size:.76rem;font-weight:700;padding:5px 13px;border-radius:100px;transition:.3s}
+        .pill.ok{background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25)}
+        .pill.ok::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--success);animation:blink 1.5s infinite}
+        .pill.mv{background:rgba(217,70,239,.12);color:var(--accent);border:1px solid rgba(217,70,239,.25)}
+        .pill.off{background:rgba(239,68,68,.08);color:var(--danger);border:1px solid rgba(239,68,68,.18)}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+        #pwrBtn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(239,68,68,.35);background:rgba(239,68,68,.06);color:var(--danger);font-size:1.05rem;cursor:pointer;transition:.3s;display:flex;align-items:center;justify-content:center}
+        #pwrBtn.on{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:var(--success)}
+        #pwrBtn:hover{transform:scale(1.1);box-shadow:0 0 16px rgba(239,68,68,.25)}
+        #pwrBtn.on:hover{box-shadow:0 0 16px rgba(16,185,129,.25)}
+
+        #ctrl{bottom:14px;left:14px;width:280px;padding:18px;display:flex;flex-direction:column;gap:14px}
+        .ptitle{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--sub);border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:7px}
+        .dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;width:160px;margin:0 auto}
+        .db{height:50px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:11px;font-size:1.15rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:var(--text)}
+        .db:hover{background:rgba(99,102,241,.16);border-color:var(--primary);box-shadow:0 0 12px rgba(99,102,241,.2);transform:translateY(-1px)}
+        .db:active,.db.on{background:var(--primary);border-color:var(--primary);box-shadow:0 0 16px rgba(99,102,241,.4);transform:scale(.94)}
+        .db.stp{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.18);color:#ef4444}
+        .db.stp:hover,.db.stp.on{background:#ef4444;color:#fff;box-shadow:0 0 12px rgba(239,68,68,.35)}
+        .db.empty{opacity:0;pointer-events:none}
+        .db.dis{opacity:.25;pointer-events:none}
+        .kh{font-size:.68rem;color:var(--sub);text-align:center;line-height:1.45}
+
+        #cfg{bottom:14px;right:14px;width:270px;padding:18px;display:flex;flex-direction:column;gap:12px}
+        .sg{display:flex;flex-direction:column;gap:4px}
+        .sh{display:flex;justify-content:space-between;font-size:.78rem;font-weight:600;color:var(--sub)}
+        .sv{color:var(--primary);font-family:monospace}
+        input[type=range]{width:100%;height:4px;background:rgba(255,255,255,.07);border-radius:100px;outline:none;-webkit-appearance:none;cursor:pointer}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--primary);box-shadow:0 0 7px rgba(99,102,241,.45);cursor:pointer;transition:transform .1s}
+        input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3)}
+
+        #jud{top:88px;right:14px;width:255px;padding:16px;display:flex;flex-direction:column;gap:8px}
+        .jg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+        .ji{background:rgba(255,255,255,.018);border:1px solid rgba(255,255,255,.04);border-radius:7px;padding:5px 9px;display:flex;justify-content:space-between;font-size:.68rem}
+        .jn{color:var(--sub);font-weight:600}
+        .jv{font-family:monospace;font-weight:700}
+        .fl{color:#00FF9D}.fr{color:#00E5FF}.rl{color:#00FF9D}.rr{color:#00E5FF}
+
+        #offOvl{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;transition:opacity .5s}
+        #offOvl .ring{width:74px;height:74px;border-radius:50%;border:3px solid rgba(239,68,68,.25);display:flex;align-items:center;justify-content:center;font-size:2rem;color:rgba(239,68,68,.4);animation:pulse 2.5s infinite}
+        @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.25)}50%{box-shadow:0 0 0 14px rgba(239,68,68,0)}}
+        #offOvl p{color:rgba(239,68,68,.4);font-size:.8rem;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+
+        #ld{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .5s}
+        .spin{width:44px;height:44px;border:3px solid rgba(99,102,241,.12);border-top-color:var(--primary);border-radius:50%;animation:sp 1s linear infinite}
+        @keyframes sp{to{transform:rotate(360deg)}}
+        .pbar{width:220px;height:4px;background:rgba(255,255,255,.06);border-radius:100px;overflow:hidden;}
+        .pfill{height:100%;width:0%;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .2s ease;box-shadow:0 0 8px rgba(99,102,241,.4);}
+        body.embed-mini .panel,body.embed-mini #offOvl{display:none!important}
+        body.embed-showcase #jud,body.embed-showcase #ctrl,body.embed-showcase #cfg,body.embed-showcase #hdr,body.embed-showcase #offOvl{display:none!important}
+        body.embed-mini.transparent,body.embed-mini.transparent html{background:transparent!important}
+        body.embed-mini.transparent #cv{background:transparent!important}
+        body.embed-mini.transparent canvas{background:transparent!important}
+        body.embed-mini.transparent #ld{background:transparent!important}
+    </style>
+</head>
+<body>
+
+<div id="ld">
+    <div class="spin"></div>
+    <p id="ldtxt" style="color:var(--sub);font-size:.9rem;font-weight:600">Chargement des modèles STL…</p>
+    <div class="pbar"><div class="pfill" id="pf"></div></div>
+</div>
+
+<div id="cv"></div>
+
+<div id="offOvl">
+    <div class="ring">⏻</div>
+    <p>Hors tension — Robot allongé</p>
+</div>
+
+<div class="panel" id="hdr">
+    <div class="logo">SpotMicro 3D</div>
+    <div class="hdr-r">
+        <div class="pill off" id="stPill">Hors tension</div>
+        <button id="pwrBtn" onclick="togglePower()" title="Marche / Arrêt">⏻</button>
+    </div>
+</div>
+
+<div class="panel" id="jud">
+    <div class="ptitle">Articulations (12-DOF)</div>
+    <div class="jg" id="jg"></div>
+</div>
+
+<div class="panel" id="ctrl">
+    <div class="ptitle">Navigation</div>
+    <div class="dpad">
+        <button class="db dis" id="btl" onmousedown="mv('tl')" onmouseup="mv('s')" onmouseleave="mv('s')">↺</button>
+        <button class="db dis" id="bfw" onmousedown="mv('bk')" onmouseup="mv('s')" onmouseleave="mv('s')">▲</button>
+        <button class="db dis" id="btr" onmousedown="mv('tr')" onmouseup="mv('s')" onmouseleave="mv('s')">↻</button>
+        <button class="db dis" id="bsl" onmousedown="mv('sr')" onmouseup="mv('s')" onmouseleave="mv('s')">◀</button>
+        <button class="db stp dis" id="bstop" onmousedown="mv('s')">■</button>
+        <button class="db dis" id="bsr" onmousedown="mv('sl')" onmouseup="mv('s')" onmouseleave="mv('s')">▶</button>
+        <button class="db empty"></button>
+        <button class="db dis" id="bbk" onmousedown="mv('fw')" onmouseup="mv('s')" onmouseleave="mv('s')">▼</button>
+        <button class="db empty"></button>
+    </div>
+    <div class="kh">Clavier : ZQSD · A/E tourner · Espace stop<br><span style="color:var(--accent)">⏻ pour démarrer le robot</span></div>
+</div>
+
+<div class="panel" id="cfg">
+    <div class="ptitle">Posture & Allure</div>
+    <div class="sg"><div class="sh"><span>Hauteur</span><span class="sv" id="v-h">100%</span></div><input type="range" id="s-h" min="60" max="140" value="100" oninput="syncSliders()"></div>
+    <div class="sg"><div class="sh"><span>Vitesse</span><span class="sv" id="v-sp">1.0×</span></div><input type="range" id="s-sp" min="3" max="30" value="10" oninput="syncSliders()"></div>
+    <div class="sg"><div class="sh"><span>Roulis (Roll)</span><span class="sv" id="v-ro">0°</span></div><input type="range" id="s-ro" min="-15" max="15" value="0" oninput="syncSliders()"></div>
+    <div class="sg"><div class="sh"><span>Tangage (Pitch)</span><span class="sv" id="v-pi">0°</span></div><input type="range" id="s-pi" min="-15" max="15" value="0" oninput="syncSliders()"></div>
+    <div class="sg"><div class="sh"><span>Lacet (Yaw)</span><span class="sv" id="v-ya">0°</span></div><input type="range" id="s-ya" min="-15" max="15" value="0" oninput="syncSliders()"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   SpotMicro 3D - Built using Official STL Meshes & URDF offsets.
+   ROS Coordinate System internally:
+     +X = Forward
+     +Y = Left
+     +Z = Up
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── Embed mode (Bastet app WebView) ──
+const EMBED_MODE = new URLSearchParams(location.search).get('mode') || 'interactive';
+const IS_MINI = EMBED_MODE === 'mini';
+const IS_SHOWCASE = EMBED_MODE === 'showcase';
+const IS_INTERACTIVE = EMBED_MODE === 'interactive';
+const IS_TRANSPARENT = IS_MINI && new URLSearchParams(location.search).get('transparent') === '1';
+const IS_EMBED = IS_MINI || IS_SHOWCASE;
+const JOINT_KEYS = ['fl_s','fl_t','fl_c','fr_s','fr_t','fr_c','rl_s','rl_t','rl_c','rr_s','rr_t','rr_c'];
+let liveMode = false;
+let liveConnected = false;
+
+function postToApp(msg) {
+    const payload = JSON.stringify(msg);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(payload);
+    if (window.parent !== window) window.parent.postMessage(payload, '*');
+}
+
+function handleAppMessage(raw) {
+    try {
+        const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (msg.type === 'telemetry') {
+            liveConnected = !!msg.connected;
+            liveMode = liveConnected && Array.isArray(msg.joints) && msg.joints.length === 12 && !IS_INTERACTIVE && !IS_SHOWCASE;
+            if (liveMode) applyLiveJoints(msg.joints, msg.imu);
+        }
+    } catch (e) { console.warn('Bad app message', e); }
+}
+
+window.addEventListener('message', e => handleAppMessage(e.data));
+document.addEventListener('message', e => handleAppMessage(e.data));
+
+function applyLiveJoints(joints, imu) {
+    JOINT_KEYS.forEach((k, i) => { tgt[k] = joints[i]; });
+    if (imu) {
+        const d2r = PI / 180;
+        bRoll = (imu.roll ?? 0) * d2r;
+        bPitch = (imu.pitch ?? 0) * d2r;
+        bYaw = (imu.yaw ?? 0) * d2r;
+    }
+    if (!powered) {
+        powered = true;
+        powerFrac = 1;
+        const offOvl = document.getElementById('offOvl');
+        if (offOvl) offOvl.style.opacity = '0';
+    }
+}
+
+function applyEmbedMode() {
+    document.body.classList.add(IS_MINI ? 'embed-mini' : IS_SHOWCASE ? 'embed-showcase' : 'embed-interactive');
+    if (IS_TRANSPARENT) document.body.classList.add('transparent');
+}
+
+function autoPowerForEmbed() {
+    if (!IS_EMBED) return;
+    powered = true;
+    powerFrac = 1;
+    const offOvl = document.getElementById('offOvl');
+    if (offOvl) offOvl.style.opacity = '0';
+    document.querySelectorAll('.db').forEach(b => {
+        if (!b.classList.contains('empty')) b.classList.remove('dis');
+    });
+    const stPill = document.getElementById('stPill');
+    if (stPill) { stPill.textContent = 'Prêt'; stPill.className = 'pill ok'; }
+    const pwrBtn = document.getElementById('pwrBtn');
+    if (pwrBtn) pwrBtn.className = 'on';
+}
+
+function cmdToJoystick(dir) {
+    switch (dir) {
+        case 'fw': return { x: 0, y: -1 };
+        case 'bk': return { x: 0, y: 1 };
+        case 'sl': return { x: -1, y: 0 };
+        case 'sr': return { x: 1, y: 0 };
+        case 'tl': return { x: -0.8, y: 0 };
+        case 'tr': return { x: 0.8, y: 0 };
+        default: return { x: 0, y: 0 };
+    }
+}
+
+// ── STL Files Info ──
+const STL_BASE = 'https://raw.githubusercontent.com/chvmp/spotmicro_description/master/meshes/stl/';
+const UNIQUE_STLS = [
+    { id: 'mainbody',   file: 'mainbody.stl' },
+    { id: 'frontpart',  file: 'frontpart.stl' },
+    { id: 'backpart',   file: 'backpart.stl' },
+    { id: 'lshoulder',  file: 'lshoulder.stl' },
+    { id: 'rshoulder',  file: 'rshoulder.stl' },
+    { id: 'larm',       file: 'larm.stl' },
+    { id: 'rarm',       file: 'rarm.stl' },
+    { id: 'larm_cover', file: 'larm_cover.stl' },
+    { id: 'rarm_cover', file: 'rarm_cover.stl' },
+    { id: 'lfoot',      file: 'lfoot.stl' },
+    { id: 'rfoot',      file: 'rfoot.stl' },
+    { id: 'foot',       file: 'foot.stl' }
+];
+
+const LEGS = {
+    fl: { left: true,  shiftx: 0.093,  shifty: 0.0395,  shift: 0.055,  sz: 1, sx: -1, label: 'FL' },
+    fr: { left: false, shiftx: 0.093,  shifty: -0.0395, shift: -0.055, sz: 1, sx: 1, label: 'FR' },
+    rl: { left: true,  shiftx: -0.093, shifty: 0.0395,  shift: 0.055,  sz: -1, sx: -1, label: 'RL' },
+    rr: { left: false, shiftx: -0.093, shifty: -0.0395, shift: -0.055, sz: -1, sx: 1, label: 'RR' }
+};
+
+const TROT_PHASE = { fl:0, rr:0, fr:Math.PI, rl:Math.PI };
+
+// Height constraints
+const STAND_H = 0.205;     // standing height (metres, world Y)
+const LIE_H   = 0.045;     // body height when lying folded flat
+const PI = Math.PI;
+
+// Gait parameters
+const GAIT_SPEED   = 8;
+const GAIT_THIGH_A = 0.32;
+const GAIT_CALF_A  = 0.22;
+
+// ── State ──
+let scene, camera, renderer, controls, worldGrp, robotGrp, bodyGrp;
+let legData = {};            // {fl,fr,rl,rr} → {shoulderGrp, legGrp, footGrp}
+let meshCache = {};
+let gaitT = 0;
+let cmd = 's';
+let powered = false;
+let powerFrac = 0;
+let bodyH = 1.0, spd = 1.0, bRoll = 0, bPitch = 0, bYaw = 0;
+let robotX = 0, robotY = 0, robotYaw = 0;
+const keys = {};
+
+// Joint values
+const cur = {}, tgt = {};
+Object.keys(LEGS).forEach(id => {
+    ['s','t','c'].forEach(j => { cur[id+'_'+j] = 0; tgt[id+'_'+j] = 0; });
+});
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+function init() {
+    applyEmbedMode();
+    const el = document.getElementById('cv');
+    const { w, h } = getCanvasSize();
+
+    scene = new THREE.Scene();
+    if (!IS_TRANSPARENT) {
+        scene.background = new THREE.Color(0x050505);
+        scene.fog = new THREE.FogExp2(0x050505, 0.25);
+    }
+
+    camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 30);
+    if (IS_TRANSPARENT) {
+        camera.position.set(0.55, 0.28, 0.62);
+    } else {
+        camera.position.set(0.65, 0.35, 0.70);
+    }
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: IS_TRANSPARENT });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MINI ? 1 : 2));
+    renderer.setSize(w, h);
+    if (IS_TRANSPARENT) {
+        renderer.setClearColor(0x000000, 0);
+        renderer.shadowMap.enabled = false;
+    } else {
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
+    el.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.maxPolarAngle = PI / 2 - 0.01;
+    controls.minDistance = 0.12;
+    controls.maxDistance = IS_TRANSPARENT ? 1.2 : 3.5;
+    controls.enableZoom = !IS_TRANSPARENT;
+    controls.target.set(0, IS_TRANSPARENT ? 0.09 : 0.06, 0);
+    if (IS_TRANSPARENT) controls.enablePan = false;
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, IS_TRANSPARENT ? 0.45 : 0.25));
+    const sun = new THREE.DirectionalLight(0xfff6e8, IS_TRANSPARENT ? 0.85 : 0.95);
+    sun.position.set(1, 3, 1.5);
+    if (!IS_TRANSPARENT) {
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.bias = -0.00015;
+    }
+    scene.add(sun);
+
+    const accent1 = new THREE.PointLight(0x00FF9D, IS_TRANSPARENT ? 1.8 : 2.5, 2.2);
+    accent1.position.set(-0.35, 0.6, 0.4);
+    scene.add(accent1);
+    const accent2 = new THREE.PointLight(0x00E5FF, IS_TRANSPARENT ? 1.2 : 1.6, 1.8);
+    accent2.position.set(0.4, 0.15, -0.5);
+    scene.add(accent2);
+
+    if (!IS_TRANSPARENT) {
+        const grid = new THREE.GridHelper(18, 180, 0x00FF9D, 0x151520);
+        scene.add(grid);
+        const floorMat = new THREE.ShadowMaterial({ opacity: 0.45 });
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), floorMat);
+        floor.rotation.x = -PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+    }
+
+    // worldGrp handles world-space position and yaw navigation
+    worldGrp = new THREE.Group();
+    scene.add(worldGrp);
+
+    // robotGrp maps ROS coordinates (X=Fwd, Y=Left, Z=Up) to Three.js
+    robotGrp = new THREE.Group();
+    robotGrp.rotation.x = -PI / 2;
+    robotGrp.rotation.z = PI;
+    worldGrp.add(robotGrp);
+
+    bodyGrp = new THREE.Group();
+    bodyGrp.position.z = LIE_H; // in ROS coordinates, height is Z
+    robotGrp.add(bodyGrp);
+
+    buildHUD();
+    loadAllMeshes(() => {
+        buildRobotFromCache();
+        autoPowerForEmbed();
+        if (IS_TRANSPARENT) {
+            frameCameraForMode();
+            onResize();
+            setTimeout(() => { centerCameraOnRobot(); }, 120);
+            setTimeout(() => { centerCameraOnRobot(); }, 500);
+        } else {
+            resetClassicCamera();
+            onResize();
+        }
+        postToApp({ type: 'ready' });
+
+        window.addEventListener('resize', onResize);
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(onResize).observe(el);
+        }
+        document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (powered) processKeys(); });
+        document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (powered) processKeys(); });
+
+        // Start loop
+        const clock = new THREE.Clock();
+        (function loop() {
+            requestAnimationFrame(loop);
+            update(Math.min(clock.getDelta(), 0.05));
+            controls.update();
+            renderer.render(scene, camera);
+        })();
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// MESH LOADER
+// ══════════════════════════════════════════════════════════════
+function loadAllMeshes(onComplete) {
+    const loader = new THREE.STLLoader();
+    let loadedCount = 0;
+    const total = UNIQUE_STLS.length;
+    
+    const ld = document.getElementById('ld');
+    const pfill = document.getElementById('pf');
+    const ldtxt = document.getElementById('ldtxt');
+    
+    UNIQUE_STLS.forEach(item => {
+        loader.load(STL_BASE + item.file, geometry => {
+            meshCache[item.id] = geometry;
+            loadedCount++;
+            
+            const pct = Math.round(loadedCount / total * 100);
+            if (pfill) pfill.style.width = pct + '%';
+            if (ldtxt) ldtxt.textContent = `Chargement des modèles STL… ${pct}%`;
+            
+            if (loadedCount === total) {
+                setTimeout(() => {
+                    if (ld) {
+                        ld.style.opacity = 0;
+                        setTimeout(() => ld.style.display = 'none', 500);
+                    }
+                    onComplete();
+                }, 400);
+            }
+        }, undefined, error => {
+            console.error(`Error loading mesh ${item.file}:`, error);
+            meshCache[item.id] = new THREE.BufferGeometry();
+            loadedCount++;
+            if (loadedCount === total) {
+                if (ld) ld.style.display = 'none';
+                onComplete();
+            }
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUILD ROBOT FROM MESHES
+// ══════════════════════════════════════════════════════════════
+const matGold  = new THREE.MeshStandardMaterial({ color: 0xead400, roughness: 0.38, metalness: 0.45 });
+const matDark  = new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.55, metalness: 0.25 });
+const matFoot  = new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.70, metalness: 0.05 });
+
+function buildRobotFromCache() {
+    // 1. Body Visuals
+    const mainbody = new THREE.Mesh(meshCache['mainbody'], matDark);
+    mainbody.position.set(0.0425, 0.055, -0.02);
+    mainbody.rotation.set(0, 0, PI, 'XYZ');
+    mainbody.scale.setScalar(0.001);
+    mainbody.castShadow = mainbody.receiveShadow = true;
+    bodyGrp.add(mainbody);
+
+    const backpart = new THREE.Mesh(meshCache['backpart'], matGold);
+    backpart.position.set(0.042, 0.055, -0.0195);
+    backpart.rotation.set(0, 0, PI, 'XYZ');
+    backpart.scale.setScalar(0.001);
+    backpart.castShadow = backpart.receiveShadow = true;
+    bodyGrp.add(backpart);
+
+    const frontpart = new THREE.Mesh(meshCache['frontpart'], matGold);
+    frontpart.position.set(0.042, 0.055, -0.0205);
+    frontpart.rotation.set(0, 0, PI, 'XYZ');
+    frontpart.scale.setScalar(0.001);
+    frontpart.castShadow = frontpart.receiveShadow = true;
+    bodyGrp.add(frontpart);
+
+    // 2. Legs
+
+    Object.entries(LEGS).forEach(([id, d]) => {
+        const isLeft = d.left;
+
+        // Shoulder group
+        const shoulderGrp = new THREE.Group();
+        shoulderGrp.position.set(d.shiftx, d.shifty, 0);
+        bodyGrp.add(shoulderGrp);
+
+        // Shoulder Visual
+        const shGeom = meshCache[isLeft ? 'lshoulder' : 'rshoulder'];
+        const shoulderMesh = new THREE.Mesh(shGeom, matDark);
+        if (isLeft) {
+            shoulderMesh.position.set(0.135, 0.0163, -0.0195);
+        } else {
+            shoulderMesh.position.set(0.135, 0.0938, -0.0205);
+        }
+        shoulderMesh.rotation.set(0, 0, PI, 'XYZ');
+        shoulderMesh.scale.setScalar(0.001);
+        shoulderMesh.castShadow = shoulderMesh.receiveShadow = true;
+        shoulderGrp.add(shoulderMesh);
+
+        // Leg (Thigh) group
+        const legGrp = new THREE.Group();
+        legGrp.position.set(0, d.shift, 0);
+        shoulderGrp.add(legGrp);
+
+        // Leg Visuals (Main Arm + Cover)
+        const armGeom = meshCache[isLeft ? 'larm' : 'rarm'];
+        const armMesh = new THREE.Mesh(armGeom, matDark);
+        
+        const coverGeom = meshCache[isLeft ? 'larm_cover' : 'rarm_cover'];
+        const coverMesh = new THREE.Mesh(coverGeom, matGold);
+
+        const visualPos = isLeft ? new THREE.Vector3(0.134, -0.04, -0.0095) : new THREE.Vector3(0.134, 0.149, -0.0095);
+        
+        armMesh.position.copy(visualPos);
+        armMesh.rotation.set(0, 0, PI, 'XYZ');
+        armMesh.scale.setScalar(0.001);
+        armMesh.castShadow = armMesh.receiveShadow = true;
+
+        coverMesh.position.copy(visualPos);
+        coverMesh.rotation.set(0, 0, PI, 'XYZ');
+        coverMesh.scale.setScalar(0.001);
+        coverMesh.castShadow = coverMesh.receiveShadow = true;
+
+        legGrp.add(armMesh);
+        legGrp.add(coverMesh);
+
+        // Foot (Calf) group
+        const footGrp = new THREE.Group();
+        footGrp.position.set(0.014, 0, -0.109);
+        legGrp.add(footGrp);
+
+        // Foot Visual
+        const footGeom = meshCache[isLeft ? 'lfoot' : 'rfoot'];
+        const footMesh = new THREE.Mesh(footGeom, matDark);
+        if (isLeft) {
+            footMesh.position.set(0.1195, -0.04, 0.099);
+        } else {
+            footMesh.position.set(0.1195, 0.149, 0.099);
+        }
+        footMesh.rotation.set(0, 0, PI, 'XYZ');
+        footMesh.scale.setScalar(0.001);
+        footMesh.castShadow = footMesh.receiveShadow = true;
+        footGrp.add(footMesh);
+
+        // Toe group (fixed relative to foot)
+        const toeGrp = new THREE.Group();
+        toeGrp.position.set(0, 0, -0.130);
+        footGrp.add(toeGrp);
+
+        // Toe Visual
+        const toeGeom = meshCache['foot'];
+        const toeMesh = new THREE.Mesh(toeGeom, matFoot);
+        toeMesh.position.set(0, -0.01, 0.015);
+        toeMesh.rotation.set(0, 0.40010, 0, 'XYZ');
+        toeMesh.scale.setScalar(0.001);
+        toeMesh.castShadow = toeMesh.receiveShadow = true;
+        toeGrp.add(toeMesh);
+
+        // Save reference for animation
+        legData[id] = { shoulderGrp, legGrp, footGrp };
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// JOINT HUD
+// ══════════════════════════════════════════════════════════════
+const HUD_J = [
+    ['fl_s','FL Coxa','fl'],['fl_t','FL Thigh','fl'],['fl_c','FL Calf','fl'],
+    ['fr_s','FR Coxa','fr'],['fr_t','FR Thigh','fr'],['fr_c','FR Calf','fr'],
+    ['rl_s','RL Coxa','rl'],['rl_t','RL Thigh','rl'],['rl_c','RL Calf','rl'],
+    ['rr_s','RR Coxa','rr'],['rr_t','RR Thigh','rr'],['rr_c','RR Calf','rr'],
+];
+function buildHUD() {
+    document.getElementById('jg').innerHTML = HUD_J.map(([k,lbl,leg]) =>
+        '<div class="ji"><span class="jn">'+lbl+'</span><span class="jv '+leg+'" id="h-'+k+'">0.0°</span></div>'
+    ).join('');
+}
+function refreshHUD() {
+    const r2d = 180 / PI;
+    HUD_J.forEach(([k]) => {
+        const el = document.getElementById('h-' + k);
+        if (el) el.textContent = (cur[k] * r2d).toFixed(1) + '°';
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// POWER
+// ══════════════════════════════════════════════════════════════
+function togglePower() {
+    powered = !powered;
+    document.getElementById('pwrBtn').className = powered ? 'on' : '';
+    document.getElementById('offOvl').style.opacity = powered ? '0' : '1';
+    document.querySelectorAll('.db').forEach(b => {
+        if (!b.classList.contains('empty')) b.classList.toggle('dis', !powered);
+    });
+    if (!powered) {
+        mv('s');
+        document.getElementById('stPill').textContent = 'Hors tension';
+        document.getElementById('stPill').className = 'pill off';
+    } else {
+        document.getElementById('stPill').textContent = 'Prêt';
+        document.getElementById('stPill').className = 'pill ok';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MOVEMENT
+// ══════════════════════════════════════════════════════════════
+const BTN = { fw:'bbk', bk:'bfw', sl:'bsr', sr:'bsl', tl:'btl', tr:'btr', s:'bstop' };
+function mv(dir) {
+    if (!powered && dir !== 's') return;
+    cmd = dir;
+    Object.entries(BTN).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('on', k === dir);
+    });
+    if (powered) {
+        const lbl = { fw:'Avance', bk:'Recule', sl:'Gauche', sr:'Droite', tl:'Tourne ←', tr:'Tourne →', s:'Prêt' };
+        const p = document.getElementById('stPill');
+        if (p) {
+            p.textContent = lbl[dir] || dir;
+            p.className = dir === 's' ? 'pill ok' : 'pill mv';
+        }
+    }
+    if (!IS_MINI && !liveMode) {
+        const j = cmdToJoystick(dir);
+        postToApp({ type: 'joystick', x: j.x, y: j.y });
+    }
+}
+function processKeys() {
+    if (keys['z'] || keys['arrowup'])    { mv('bk'); return; }
+    if (keys['s'] || keys['arrowdown'])  { mv('fw'); return; }
+    if (keys['q'] || keys['arrowleft'])  { mv('sr'); return; }
+    if (keys['d'] || keys['arrowright']) { mv('sl'); return; }
+    if (keys['a']) { mv('tr'); return; }
+    if (keys['e']) { mv('tl'); return; }
+    if (keys[' ']) { mv('s');  return; }
+    if (!Object.values(keys).some(Boolean)) mv('s');
+}
+
+// ══════════════════════════════════════════════════════════════
+// SLIDERS
+// ══════════════════════════════════════════════════════════════
+function syncSliders() {
+    bodyH  = parseFloat(document.getElementById('s-h').value) / 100;
+    spd    = parseFloat(document.getElementById('s-sp').value) / 10;
+    bRoll  = parseFloat(document.getElementById('s-ro').value) * PI / 180;
+    bPitch = parseFloat(document.getElementById('s-pi').value) * PI / 180;
+    bYaw   = parseFloat(document.getElementById('s-ya').value) * PI / 180;
+    document.getElementById('v-h').textContent  = Math.round(bodyH * 100) + '%';
+    document.getElementById('v-sp').textContent = spd.toFixed(1) + '×';
+    document.getElementById('v-ro').textContent = Math.round(bRoll * 180 / PI) + '°';
+    document.getElementById('v-pi').textContent = Math.round(bPitch * 180 / PI) + '°';
+    document.getElementById('v-ya').textContent = Math.round(bYaw * 180 / PI) + '°';
+}
+
+// ── Leg Inverse Kinematics (IK) ──
+// Solves joint angles given a foot target position in the LOCAL leg frame:
+//   x = along body axis (forward positive)
+//   y = lateral (outward positive for left legs)
+//   z = vertical (downward positive)
+// Returns { s, t, c } = shoulder/thigh/calf angles.
+function solveLegIK(isLeft, D) {
+    const L1 = 0.109; // thigh length (m)
+    const L2 = 0.130; // calf length (m)
+    const ld = isLeft ? 0.055 : -0.055; // shoulder lateral offset
+
+    const dx = D.x;
+    const dy = D.y;
+    const dz = D.z;  // downward from hip
+
+    // ── Shoulder (abduction) ──
+    const r_lat = Math.sqrt(dy*dy + dz*dz);
+    const s = Math.atan2(dy, dz) - Math.atan2(ld, Math.sqrt(Math.max(0, r_lat*r_lat - ld*ld)));
+
+    // ── Project into leg sagittal plane ──
+    const z_plane = -Math.sqrt(Math.max(0.001, r_lat*r_lat - ld*ld)); // leg-plane "down"
+
+    // ── Clamp reach to workspace ──
+    const D2_raw = Math.sqrt(dx*dx + z_plane*z_plane);
+    const D2_min = Math.abs(L1 - L2) + 0.001;
+    const D2_max = L1 + L2 - 0.001;
+    const D2 = Math.max(D2_min, Math.min(D2_max, D2_raw));
+
+    // Scale dx and z_plane to clamped distance if needed
+    const scale = D2_raw > 0.001 ? D2 / D2_raw : 1;
+    const dx_c = dx * scale;
+    const z_c  = z_plane * scale;
+
+    // ── Calf (knee) ──
+    const cos_c = (L1*L1 + L2*L2 - D2*D2) / (2*L1*L2);
+    const c_inner = Math.acos(Math.max(-1, Math.min(1, cos_c)));
+    const c = -(Math.PI - c_inner); // negative = knee bent forward in robot frame
+
+    // ── Thigh ──
+    const cos_a = (L1*L1 + D2*D2 - L2*L2) / (2*L1*D2);
+    const alpha = Math.acos(Math.max(-1, Math.min(1, cos_a)));
+    const gamma = Math.atan2(dx_c, -z_c);
+    const t = gamma + alpha;
+
+    return { s, t, c };
+}
+
+// ══════════════════════════════════════════════════════════════
+// GAIT ENGINE
+// ══════════════════════════════════════════════════════════════
+function computeTargets(dt) {
+    const moving = cmd !== 's' && powered;
+    if (moving) gaitT += dt * GAIT_SPEED * spd;
+
+    // ── Body posture parameters ──
+    const H   = STAND_H * bodyH;   // desired nominal body height
+    const roll  = bRoll;
+    const pitch = bPitch;
+    const yaw   = bYaw;
+
+    Object.keys(LEGS).forEach(id => {
+        const d      = LEGS[id];
+        const isLeft = d.left;
+        const ph     = TROT_PHASE[id];
+
+        if (!powered) {
+            tgt[id + '_s'] = 0;
+            tgt[id + '_t'] = 1.25;
+            tgt[id + '_c'] = -2.59;
+            return;
+        }
+
+        // ── Neutral foot position in world-space (flat ground, Z = 0) ──
+        // Hip is directly above (d.shiftx, d.shifty) with height H.
+        // Neutral foot is placed directly below the hip (+/- a fixed stance offset).
+        const foot_world_x = d.shiftx;
+        const foot_world_y = d.shifty + (isLeft ? 0.04 : -0.04);
+        const foot_world_z = 0.0; // foot on the ground plane at Z=0
+
+        // ── Gait offsets (local oscillation, keep foot on ground during stance) ──
+        let gait_dx = 0, gait_dy = 0, gait_dz = 0;
+        if (moving) {
+            const wave  = Math.sin(gaitT + ph);
+            const wave2 = Math.sin(gaitT + ph + PI * 0.5);
+            gait_dz = Math.max(0, 0.04 * wave2); // lift during swing phase
+
+            if (cmd === 'fw' || cmd === 'bk') {
+                gait_dx = (cmd === 'bk' ? -1 : 1) * 0.05 * wave;
+            } else if (cmd === 'sl' || cmd === 'sr') {
+                // Lateral strafe: move foot sideways
+                gait_dy = (cmd === 'sl' ? -1 : 1) * 0.04 * wave;
+            } else if (cmd === 'tl' || cmd === 'tr') {
+                // Turning: arc motion using both x and y to force shoulder joint
+                const dir = cmd === 'tl' ? -1 : 1;
+                // Outer legs stride forward, inner legs stride backward
+                const fwd = dir * (isLeft ? 1 : -1);
+                gait_dx = fwd * 0.045 * wave;
+                // Lateral sweep for abduction: outer legs abduct, inner legs adduct
+                gait_dy = dir * (isLeft ? -1 : 1) * 0.04 * wave;
+            }
+        }
+
+        // ── Body tilt: adjust hip world position by the body rotation ──
+        // Hip positions on the tilted body frame:
+        const cP = Math.cos(pitch), sP = Math.sin(pitch);
+        const cR = Math.cos(roll),  sR = Math.sin(roll);
+        const cY = Math.cos(yaw),   sY = Math.sin(yaw);
+
+        // Hip in local body frame
+        const hx_local = d.shiftx;
+        const hy_local = d.shifty;
+        const hz_local = 0;
+
+        // Apply body rotation (ZXY → pitch around Y, roll around X, yaw around Z)
+        const hx_rot = cY*cP*hx_local + (-sY*cR + cY*sP*sR)*hy_local + (sY*sR + cY*sP*cR)*hz_local;
+        const hy_rot = sY*cP*hx_local + ( cY*cR + sY*sP*sR)*hy_local + (-cY*sR + sY*sP*cR)*hz_local;
+        const hz_rot =    -sP*hx_local +                       cP*sR *hy_local +               cP*cR *hz_local;
+
+        // Hip world position: body center at height H
+        const hip_x = hx_rot;
+        const hip_y = hy_rot;
+        const hip_z = H + hz_rot;
+
+        // ── Vector from hip to foot in world ──
+        const w_dx = (foot_world_x + gait_dx) - hip_x;
+        const w_dy = (foot_world_y + gait_dy)  - hip_y;
+        const w_dz = (foot_world_z + gait_dz)  - hip_z; // dz is upward lift
+
+        // ── Express in local body frame (inverse rotation) ──
+        // Inverse rotation (transpose of ZXY = apply -roll, -pitch, -yaw)
+        const nR = -roll, nP = -pitch, nY = -yaw;
+        const cnY = Math.cos(nY), snY = Math.sin(nY);
+        const cnP = Math.cos(nP), snP = Math.sin(nP);
+        const cnR = Math.cos(nR), snR = Math.sin(nR);
+
+        // First un-yaw
+        const ux = cnY*w_dx - snY*w_dy;
+        const uy = snY*w_dx + cnY*w_dy;
+        const uz = w_dz;
+
+        // Then un-pitch
+        const px = cnP*ux + snP*uz;
+        const py = uy;
+        const pz = -snP*ux + cnP*uz;
+
+        // Then un-roll
+        const lx = px;
+        const ly = cnR*py - snR*pz;
+        const lz = snR*py + cnR*pz;
+
+        // IK: local frame is x=forward, y=lateral, z=down (from hip)
+        // Our IK expects z downward positive
+        const D_local = { x: lx, y: ly, z: -lz };
+
+        const sol = solveLegIK(isLeft, D_local);
+
+        tgt[id + '_s'] = sol.s;
+        tgt[id + '_t'] = sol.t;
+        tgt[id + '_c'] = sol.c;
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// UPDATE — called every frame
+// ══════════════════════════════════════════════════════════════
+function update(dt) {
+    if (liveMode) {
+        const rate = Math.min(1, dt * 15);
+        Object.keys(cur).forEach(k => { cur[k] += (tgt[k] - cur[k]) * rate; });
+        Object.entries(legData).forEach(([id, leg]) => {
+            leg.shoulderGrp.rotation.x = cur[id + '_s'];
+            leg.legGrp.rotation.y      = cur[id + '_t'];
+            leg.footGrp.rotation.y     = cur[id + '_c'];
+        });
+        const standH = STAND_H * bodyH;
+        bodyGrp.position.z = standH;
+        bodyGrp.rotation.set(bRoll, bPitch, bYaw, 'ZXY');
+        if (IS_TRANSPARENT) {
+            applyEmbedCameraTarget(standH);
+        } else {
+            controls.target.set(worldGrp.position.x, standH * 0.5, worldGrp.position.z);
+        }
+        refreshHUD();
+        return;
+    }
+
+    // Power lerp (lying ↔ standing)
+    const tgtPower = powered ? 1 : 0;
+    powerFrac += (tgtPower - powerFrac) * Math.min(1, dt * 3.2);
+
+    // World position integration
+    if (powered && cmd !== 's') {
+        const v = 0.15 * spd;
+        if      (cmd === 'fw') { robotX += Math.cos(robotYaw)*v*dt; robotY += Math.sin(robotYaw)*v*dt; }
+        else if (cmd === 'bk') { robotX -= Math.cos(robotYaw)*v*dt; robotY -= Math.sin(robotYaw)*v*dt; }
+        else if (cmd === 'sl') { robotX -= Math.sin(robotYaw)*v*0.7*dt; robotY += Math.cos(robotYaw)*v*0.7*dt; }
+        else if (cmd === 'sr') { robotX += Math.sin(robotYaw)*v*0.7*dt; robotY -= Math.cos(robotYaw)*v*0.7*dt; }
+        else if (cmd === 'tl') { robotYaw -= 0.8*spd*dt; }
+        else if (cmd === 'tr') { robotYaw += 0.8*spd*dt; }
+    }
+    worldGrp.position.x = robotX;
+    worldGrp.position.z = -robotY;
+    worldGrp.rotation.y = robotYaw;
+
+    // Compute joint targets
+    computeTargets(dt);
+
+    // Lerp joints
+    const rate = Math.min(1, dt * 10);
+    Object.keys(cur).forEach(k => { cur[k] += (tgt[k] - cur[k]) * rate; });
+
+    // Apply joint angles
+    Object.entries(legData).forEach(([id, leg]) => {
+        leg.shoulderGrp.rotation.x = cur[id + '_s'];
+        leg.legGrp.rotation.y      = cur[id + '_t'];
+        leg.footGrp.rotation.y     = cur[id + '_c'];
+    });
+
+    // ── Body height in 3D: interpolate between lie and stand ──
+    const standH = STAND_H * bodyH;
+    const currentH = LIE_H + (standH - LIE_H) * powerFrac;
+    bodyGrp.position.z = currentH;
+
+    // ── Body tilt in 3D: apply slider roll/pitch/yaw directly to bodyGrp ──
+    // Only visible when powered. bodyGrp rotates but its children (legs) compensate via IK.
+    bodyGrp.rotation.set(bRoll * powerFrac, bPitch * powerFrac, bYaw * powerFrac, 'ZXY');
+
+    // Breathing idle animation
+    if (powered && cmd === 's') {
+        bodyGrp.position.z += Math.sin(Date.now() * 0.003) * 0.001;
+    }
+
+    // Camera follow
+    if (IS_TRANSPARENT) {
+        applyEmbedCameraTarget(currentH);
+    } else {
+        controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
+    }
+
+    refreshHUD();
+}
+
+// ══════════════════════════════════════════════════════════════
+// RESIZE
+// ══════════════════════════════════════════════════════════════
+let embedLookAt = null;
+
+function centerCameraOnRobot() {
+    if (!robotGrp || !worldGrp || !camera || !controls) return;
+    if (!IS_TRANSPARENT) return;
+
+    worldGrp.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(worldGrp);
+    if (box.isEmpty()) return;
+
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box.getCenter(center);
+    box.getSize(size);
+
+    const maxDim = Math.max(size.x, size.y, size.z, 0.18);
+    embedLookAt = center.clone();
+
+    const dist = 0.9;
+    camera.position.set(
+        center.x + maxDim * dist,
+        center.y + maxDim * 0.5,
+        center.z + maxDim * dist
+    );
+    controls.target.copy(center);
+    controls.minDistance = maxDim * 0.4;
+    controls.maxDistance = maxDim * 2.5;
+    camera.lookAt(center);
+    controls.update();
+}
+
+function applyEmbedCameraTarget(currentH) {
+    if (!controls) return;
+    worldGrp.position.y = 0;
+    if (IS_TRANSPARENT && embedLookAt) {
+        controls.target.copy(embedLookAt);
+    } else if (!IS_TRANSPARENT) {
+        controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
+    }
+}
+
+function resetClassicCamera() {
+    if (!camera || !controls) return;
+    controls.target.set(0, 0.06, 0);
+    camera.position.set(0.65, 0.35, 0.70);
+    controls.minDistance = 0.12;
+    controls.maxDistance = 3.5;
+    camera.lookAt(controls.target);
+    controls.update();
+}
+
+function frameCameraForMode() {
+    if (!camera || !controls) return;
+    if (IS_TRANSPARENT) {
+        centerCameraOnRobot();
+        return;
+    }
+    resetClassicCamera();
+}
+
+function getCanvasSize() {
+    const el = document.getElementById('cv');
+    if (!el) return { w: window.innerWidth, h: window.innerHeight };
+    const w = el.clientWidth || window.innerWidth;
+    const h = el.clientHeight || window.innerHeight;
+    return { w: Math.max(1, w), h: Math.max(1, h) };
+}
+
+function onResize() {
+    if (!camera || !renderer) return;
+    const { w, h } = getCanvasSize();
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    if (IS_TRANSPARENT) {
+        frameCameraForMode();
+    } else if (controls) {
+        resetClassicCamera();
+    }
+}
+
+window.onload = function() {
+    function boot() {
+        const el = document.getElementById('cv');
+        if (!el || el.clientWidth < 20 || el.clientHeight < 20) {
+            requestAnimationFrame(boot);
+            return;
+        }
+        init();
+    }
+    boot();
+};
+</script>
+</body>
+</html>

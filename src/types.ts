@@ -136,3 +136,162 @@ export interface UserAccount {
   is_admin: boolean;
   preferences?: Record<string, any>;
 }
+
+// ─── WebSocket : Outbound messages ────────────────────────────
+
+export interface CmdVelMessage {
+  type: 'cmd_vel';
+  linear: number;
+  angular: number;
+}
+
+export interface RequestCameraMessage {
+  type: 'request_camera';
+  camera: 1 | 2;
+  v_slam?: boolean;
+}
+
+export interface ReleaseCameraMessage {
+  type: 'release_camera';
+  camera: 1 | 2;
+}
+
+export interface StopCameraMessage {
+  type: 'stop_camera';
+  camera: 1 | 2;
+}
+
+export interface NavGoalMessage {
+  type: 'nav_goal';
+  x: number;
+  y: number;
+}
+
+export type ArduinoCmdType = 'stand' | 'sit' | 'attach' | 'detach' | 'write' | 'reset_imu';
+
+export interface ArduinoCmdMessage {
+  type: 'arduino_cmd';
+  cmd: ArduinoCmdType;
+  index?: number;
+  angle?: number;
+}
+
+export interface ManualJointControlMessage {
+  type: 'manual_joint_control';
+  angles: number[];
+}
+
+export interface MonoCalibMessage {
+  type: 'run_mono_calib';
+  camera: 1 | 2;
+  chessboard_cols: number;
+  chessboard_rows: number;
+  square_size_mm: number;
+  timeout_seconds?: number;
+}
+
+export interface StereoCalibMessage {
+  type: 'run_stereo_calib';
+  chessboard_cols: number;
+  chessboard_rows: number;
+  square_size_mm: number;
+  timeout_seconds?: number;
+}
+
+// ─── WebSocket : Inbound calibration ──────────────────────────
+
+export interface MonoCalibFrame {
+  type: 'mono_calib_frame';
+  camera: number;
+  image: string;
+}
+
+export interface MonoCalibProgress {
+  type: 'mono_calib_progress';
+  camera: number;
+  message: string;
+  progress: number;
+}
+
+export interface MonoCalibResult {
+  type: 'mono_calib_result';
+  camera: number;
+  success: boolean;
+  message: string;
+  fx?: number;
+  reprojection_error?: number;
+}
+
+export interface StereoCalibFrame {
+  type: 'stereo_calib_frame';
+  image: string;
+}
+
+export interface StereoCalibProgress {
+  type: 'stereo_calib_progress';
+  message: string;
+  progress: number;
+}
+
+export interface StereoCalibResult {
+  type: 'stereo_calib_result';
+  success: boolean;
+  message: string;
+  reprojection_error?: number;
+}
+
+export interface CalibrationState {
+  active: boolean;
+  mode: 'mono' | 'stereo' | null;
+  camera: number | null;
+  progress: number;
+  message: string;
+  lastResult: MonoCalibResult | StereoCalibResult | null;
+  lastFrame: string | null;
+}
+
+// ─── REST : Cameras & Streams ─────────────────────────────────
+
+export interface CameraManifestEntry {
+  id: number;
+  name?: string;
+  connected?: boolean;
+}
+
+export interface StreamState {
+  camera: number;
+  active: boolean;
+  viewers?: number;
+  keep_alive?: boolean;
+}
+
+export interface StreamConfig {
+  resolution: string;
+  framerate: number;
+  bitrate: string;
+}
+
+// ─── REST : Calibration & Diagnostics ─────────────────────────
+
+export interface ServoCalibration {
+  offsets: number[];
+}
+
+export interface CameraIntrinsicCalibration {
+  [key: string]: unknown;
+}
+
+export interface HealthStatus {
+  status: 'healthy' | 'unhealthy' | string;
+}
+
+export interface MyGesTestResult {
+  valid: boolean;
+  preview?: string;
+  message?: string;
+}
+
+export interface RollbackRequest {
+  version: string;
+}
+

@@ -1,35 +1,54 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
-// Default gateway - always ha.arthonetwork.fr
+// Env: EXPO_PUBLIC_GATEWAY_IP, EXPO_PUBLIC_GATEWAY_PORT (default 44888),
+//      EXPO_PUBLIC_DEV_TOKEN, EXPO_PUBLIC_USE_SSL
 export const DEFAULT_GATEWAY_IP = process.env.EXPO_PUBLIC_GATEWAY_IP || 'ha.arthonetwork.fr';
+export const GATEWAY_API_PORT = Number(process.env.EXPO_PUBLIC_GATEWAY_PORT || '44888');
+export const HLS_PORT = 48888;
+export const WEBRTC_PORT = 48889;
+
+const TOKEN_KEY = 'jwt_token';
+
+export async function getApiToken(): Promise<string | null> {
+  const devToken = process.env.EXPO_PUBLIC_DEV_TOKEN;
+  if (devToken) return devToken;
+
+  if (Platform.OS !== 'web') {
+    return SecureStore.getItemAsync(TOKEN_KEY);
+  }
+  return localStorage.getItem(TOKEN_KEY);
+}
 
 export const getBaseUrl = async () => {
   const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
   const protocol = isSecure ? 'https' : 'http';
-  return `${protocol}://${DEFAULT_GATEWAY_IP}`;
+  return `${protocol}://${DEFAULT_GATEWAY_IP}:${GATEWAY_API_PORT}`;
 };
 
-const apiClient = axios.create({
-  // baseURL is set dynamically in interceptor if needed, or we can resolve it before calls.
-  // For simplicity we will attach the baseURL in the interceptor
-});
+export type StreamFormat = 'hls' | 'whep';
 
-// ═══════════════════════════════════════════════════════════════
-// REQUEST INTERCEPTOR — Log TOUT ce qui part
-// ═══════════════════════════════════════════════════════════════
+export const getStreamUrl = (cam: number, format: StreamFormat = 'whep') => {
+  const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
+  const protocol = isSecure ? 'https' : 'http';
+  const port = format === 'hls' ? HLS_PORT : WEBRTC_PORT;
+  const suffix = format === 'whep' ? '/whep' : '/';
+  return `${protocol}://${DEFAULT_GATEWAY_IP}:${port}/robot/cam${cam}${suffix}`;
+};
+
+const apiClient = axios.create({});
+
 apiClient.interceptors.request.use(
   async (config) => {
     const startTime = Date.now();
     (config as any)._startTime = startTime;
 
-    // Dynamically set BaseURL
     if (!config.baseURL) {
       config.baseURL = await getBaseUrl();
     }
-    
-    // Attach API Token
-    const token = process.env.EXPO_PUBLIC_DEV_TOKEN;
+
+    const token = await getApiToken();
     if (token) {
       config.headers['X-API-Token'] = token;
     }
@@ -65,15 +84,12 @@ apiClient.interceptors.request.use(
   }
 );
 
-// ═══════════════════════════════════════════════════════════════
-// RESPONSE INTERCEPTOR — Log TOUT ce qui revient
-// ═══════════════════════════════════════════════════════════════
 apiClient.interceptors.response.use(
   (response) => {
-    const duration = (response.config as any)._startTime 
-      ? `${Date.now() - (response.config as any)._startTime}ms` 
+    const duration = (response.config as any)._startTime
+      ? `${Date.now() - (response.config as any)._startTime}ms`
       : '?ms';
-    
+
     const dataStr = JSON.stringify(response.data);
     const truncated = dataStr.length > 800 ? dataStr.substring(0, 800) + `...(${dataStr.length} chars total)` : dataStr;
 
@@ -90,8 +106,8 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    const duration = error.config?._startTime 
-      ? `${Date.now() - error.config._startTime}ms` 
+    const duration = error.config?._startTime
+      ? `${Date.now() - error.config._startTime}ms`
       : '?ms';
 
     console.error(`\n╔══════════════════════════════════════════════╗`);

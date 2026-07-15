@@ -12,3 +12,8 @@ export const getIntranetCredentials = async () => {
   const response = await apiClient.get('/myges');
   return response.data;
 };
+
+export const testMyGesCredentials = async (username: string, password: string) => {
+  const response = await apiClient.post('/myges/test', { username, password });
+  return response.data;
+};

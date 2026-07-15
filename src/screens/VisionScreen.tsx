@@ -1,29 +1,36 @@
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { DEFAULT_GATEWAY_IP } from '../api/client';
+import { getStreamUrl } from '../api/client';
+import { joinStream, leaveStream } from '../api/cameras';
+import { useWebSocket } from '../context/WebSocketContext';
 import { theme } from '../theme';
 
 export default function VisionScreen() {
-  const isSecure = process.env.EXPO_PUBLIC_USE_SSL !== 'false';
-  const protocol = isSecure ? 'https' : 'http';
-  const [videoUrl] = useState(`${protocol}://${DEFAULT_GATEWAY_IP}:48889/robot/cam1`);
+  const { requestCamera, releaseCamera } = useWebSocket();
+  const videoUrl = getStreamUrl(1, 'hls');
 
+  useEffect(() => {
+    requestCamera(1);
+    joinStream(1).catch(() => {});
+    return () => {
+      releaseCamera(1);
+      leaveStream(1).catch(() => {});
+    };
+  }, [requestCamera, releaseCamera]);
 
   return (
     <View style={styles.container}>
-      
-      {/* Raw Video Feed */}
       <View style={StyleSheet.absoluteFillObject}>
         {Platform.OS === 'web' ? (
-          <iframe 
-            src={videoUrl} 
-            style={{ width: '100%', height: '100%', border: 'none' } as any} 
+          <iframe
+            src={videoUrl}
+            style={{ width: '100%', height: '100%', border: 'none' } as any}
           />
         ) : (
-          <WebView 
-            source={{ uri: videoUrl }} 
+          <WebView
+            source={{ uri: videoUrl }}
             style={styles.webview}
             scrollEnabled={false}
             showsHorizontalScrollIndicator={false}
@@ -34,7 +41,7 @@ export default function VisionScreen() {
 
       <SafeAreaView style={styles.hudOverlay} pointerEvents="box-none">
         <View style={styles.topHud} pointerEvents="none">
-          <Text style={styles.hudText}>REC •</Text>
+          <Text style={styles.hudText}>REC • HLS</Text>
         </View>
       </SafeAreaView>
     </View>

@@ -46,10 +46,17 @@ docker compose ps
 ---
 
 ## API & Sécurité
-L'API est accessible en **HTTP** (port `44888`).
+L'API est accessible en **HTTPS** (port `44888`) via `https://ha.arthonetwork.fr:44888`.
 Chaque requête doit inclure le Header : `X-API-Token: votre-token`.
+WebSocket : `wss://ha.arthonetwork.fr:44888/ws/app?token=votre_token`
 
-👉 [Consultez la Documentation complète de l'API (API_DOC.md)](API_DOC.md) pour les détails sur les endpoints d'authentification (`/auth/login`, `/auth/register`), MyGES et Visages.
+### Variables d'environnement (App Mobile)
+| Variable | Défaut | Description |
+|---|---|---|
+| `EXPO_PUBLIC_GATEWAY_IP` | `ha.arthonetwork.fr` | Hôte Gateway |
+| `EXPO_PUBLIC_GATEWAY_PORT` | `44888` | Port API REST/WS |
+| `EXPO_PUBLIC_USE_SSL` | `true` | HTTPS/WSS |
+| `EXPO_PUBLIC_DEV_TOKEN` | — | Token API (dev/CI) |
 
 ---
 
@@ -58,8 +65,8 @@ Chaque requête doit inclure le Header : `X-API-Token: votre-token`.
 | Format | URL |
 |---|---|
 | RTSP | `rtsp://IP_GATEWAY:48554/robot/cam1` |
-| HLS  | `http://IP_GATEWAY:48888/robot/cam1` |
-| WebRTC | `http://IP_GATEWAY:48889/robot/cam1` |
+| HLS  | `https://IP_GATEWAY:48888/robot/cam1/` |
+| WebRTC (WHEP) | `https://IP_GATEWAY:48889/robot/cam1/whep` |
 
 ---
 
@@ -103,17 +110,22 @@ Canal bidirectionnel exclusif pour le serveur de calcul.
 ### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile)
 Canal pour l'utilisateur (État du robot, télécommande).
 
-#### Messages WebSockets Importants
-- **`telemetry_diagnostics`** : Envoyé périodiquement par le robot. Contient :
-  - `joints` : Liste des 12 angles de servomoteurs (de 0 à 11).
-  - `imu` : Données gyroscopiques (`roll`, `pitch`, `yaw`).
-  - `topics` : Liste des topics ROS 2 actifs (`name`, `type`, `hz`).
-  - `pose` & `path` : Coordonnées de localisation SLAM.
-  - `ai_state` : État actif des modules IA.
-- **`scan_wifi`** : Envoyé par l'App pour demander la recherche des réseaux à proximité.
-- **`wifi_list`** : Renvoyé par le robot avec les réseaux triés par force de signal décroissante.
-- **`wifi_list_error`** : Renvoyé par le robot quand le scan échoue (timeout, interface verrouillée par NetworkManager, aucun scanner disponible). Contient `error`, `interface`, `manager` (`NetworkManager` / `wpa_supplicant` / `none` / `unknown`), `known_ssids`, `current_ssid`. Garantit que le dashboard arrête son spinner même en cas d'échec.
-- **`camera_setup`** : Active ou désactive un flux caméra sur le robot (`camera`: 1 ou 2, `enable`: true/false).
+#### Messages WebSocket App → Gateway → Robot
+- **`request_camera`** : `{ "type": "request_camera", "camera": 1, "v_slam": false }`
+- **`release_camera`** : `{ "type": "release_camera", "camera": 1 }`
+- **`stop_camera`** : `{ "type": "stop_camera", "camera": 1 }`
+- **`cmd_vel`** : `{ "type": "cmd_vel", "linear": 0.2, "angular": -0.5 }`
+- **`nav_goal`** : `{ "type": "nav_goal", "x": 1.25, "y": -0.8 }`
+- **`arduino_cmd`** : `{ "type": "arduino_cmd", "cmd": "stand" }` (stand, sit, attach, detach, write, reset_imu)
+- **`manual_joint_control`** : `{ "type": "manual_joint_control", "angles": [90.0, ...] }` (12 angles)
+- **`chat`** : `{ "type": "chat", "text": "Bonjour Bastet" }`
+- **`run_mono_calib`** / **`run_stereo_calib`** : Lancement calibration caméra
+- **`telemetry_diagnostics`** (entrant) : joints, imu, topics, pose, path, ai_state
+- **`stream_status`** (entrant) : `{ "type": "stream_status", "camera": 1, "active": true }`
+- **`mono_calib_*`** / **`stereo_calib_*`** (entrant) : frames, progress, result
+
+#### Messages WiFi (legacy, conservés par l'App)
+- **`scan_wifi`**, **`wifi_list`**, **`wifi_list_error`**, **`connect_wifi`**, **`forget_wifi`**
 
 ---
 
@@ -148,6 +160,12 @@ Vérifie les identifiants et retourne les informations de l'utilisateur.
 ### **GET `/accounts`**
 Liste tous les comptes enregistrés (nécessite d'être Admin).
 
+### **DELETE `/accounts/{full_name}`**
+Supprime un compte (MyGES et visages inclus).
+
+### **POST `/preferences`**
+Enregistre les préférences utilisateur.
+
 ---
 
 ## 3. Identifiants Intranet / MyGES (REST)
@@ -156,6 +174,7 @@ Le robot accède aux données MyGES via ces endpoints.
 
 - **POST `/myges`** : Enregistre les identifiants MyGES (username/password) pour un utilisateur.
 - **GET `/myges`** : Récupère les identifiants MyGES (interrogé par le robot).
+- **POST `/myges/test`** : Teste la validité des identifiants et retourne un aperçu du planning.
 
 ---
 
@@ -175,18 +194,46 @@ L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 Géré par MediaMTX (intégré à la Gateway). L'encodage vidéo H.264 utilise obligatoirement le profil standard `yuv420p` pour assurer une compatibilité totale avec les navigateurs web récents.
 - **RTSP (Publication/Lecture)** : `rtsp://GATEWAY_IP:48554/robot/cam1` (Basse latence, pour le Node/IA)
 - **HLS** : `https://ha.arthonetwork.fr:48888/robot/cam1/` (Streaming web via lecteur intégré Caddy)
-- **WebRTC** : `https://ha.arthonetwork.fr:48889/robot/cam1` (Ultra-basse latence pour l'App Mobile)
+- **WebRTC (WHEP)** : `https://ha.arthonetwork.fr:48889/robot/cam1/whep`
+
+### 5.1 API REST des Flux Caméras (On-Demand)
+- **GET `/api/cameras`** : Manifest des caméras
+- **GET `/api/streams`** : État de tous les flux
+- **GET `/api/streams/{cam}`** : État d'un flux
+- **POST `/api/streams/{cam}/join`** : Rejoindre un flux
+- **DELETE `/api/streams/{cam}/leave`** : Quitter un flux
+- **POST `/api/streams/{cam}/stop`** : Arrêt forcé
+
+### 5.2 Configuration Qualité Stream
+- **GET/POST `/core/stream/config`** : résolution, framerate, bitrate
+
+### 5.3 Calibration REST
+- **POST `/api/calibration/camera/run/mono`**
+- **POST `/api/calibration/camera/run/stereo`**
+- **POST `/api/calibration/camera/abort`**
 
 ---
 
-## 6. État du Robot (CORE State)
+## 6. État du Robot, Calibration & Téléopération (REST)
 
-Permet de suivre en temps réel ce que voit et fait le robot.
+### 6.1 Diagnostic & État
+- **GET/POST `/core/state`**
+- **GET `/core/diagnostics`**
 
-- **POST `/core/state`** : Mise à jour de l'état (par le robot).
-- **GET `/core/state`** : Récupération de l'état (par l'app).
+### 6.2 Calibration Servomoteurs & Caméras
+- **GET/POST `/core/calibration`** : 12 offsets servos
+- **GET/POST `/core/camera/calibration/{cam_id}`**
+- **GET/POST `/core/camera/calibration/stereo`**
+- **POST `/core/camera/calibration/reset`**
 
-**Payload de l'état :**
+### 6.3 Téléopération & Contrôle Moteur (REST)
+- **POST `/api/robot/navigation/goal`** : `{ "x": 1.5, "y": -0.5 }`
+- **POST `/api/robot/motion/velocity`** : `{ "linear": 0.2, "angular": -0.1 }`
+- **POST `/api/robot/motion/joints`** : `{ "angles": [90.0, ...] }`
+- **POST `/api/robot/arduino/command`** : `{ "cmd": "stand" }`
+- **POST `/api/robot/chat`** : `{ "text": "Fais un pas en avant" }`
+
+**Payload CORE State :**
 ```json
 {
   "seen_person": "Nom reconnu ou null",
@@ -267,3 +314,18 @@ Récupère le statut et la progression du flashage Arduino.
 
 ### **POST `/system/update/arduino/progress`**
 Permet au robot de notifier l'avancement du flash de l'Arduino.
+
+### **POST `/system/update/gateway/rollback`**
+Rollback Gateway : `{ "version": "v0.3.7" }`
+
+### **POST `/system/update/robot/rollback`**
+Rollback Robot : `{ "version": "v0.2.27" }`
+
+---
+
+## 8. Diagnostic Santé (REST)
+
+### **GET `/health`**
+```json
+{ "status": "healthy" }
+```

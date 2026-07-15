@@ -1,4 +1,4 @@
-import apiClient from './client';
+import apiClient, { getApiToken } from './client';
 import { FaceEntry } from '../types';
 
 /**
@@ -18,11 +18,12 @@ export const getFaces = async (): Promise<FaceEntry[]> => {
 };
 
 /**
- * GET /faces/{face_id}/image — Récupérer l'image d'un visage
- * Retourne l'URL complète pour affichage
+ * GET /faces/{face_id}/image — URL complète avec token pour affichage
  */
-export const getFaceImageUrl = (faceId: string, baseUrl: string): string => {
-  return `${baseUrl}/faces/${faceId}/image`;
+export const getFaceImageUrl = async (faceId: string, baseUrl: string): Promise<string> => {
+  const token = await getApiToken();
+  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+  return `${baseUrl}/faces/${faceId}/image${qs}`;
 };
 
 /**

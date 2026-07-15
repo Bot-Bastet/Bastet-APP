@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Switch, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withSequence } from 'react-native-reanimated';
-import { Battery, BatteryCharging, SignalHigh, Lock, Shield, Power, Footprints, Settings as SettingsIcon, Camera, MapPin, Wifi, Activity, RefreshCw, ChevronLeft, Cpu, Thermometer, Video, VideoOff } from 'lucide-react-native';
+import { Battery, BatteryCharging, SignalHigh, Settings as SettingsIcon, Camera, MapPin, Wifi, Activity, ChevronLeft, Cpu, Thermometer, Video, VideoOff, Gamepad2, ArrowUp, ArrowDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 import { useWebSocket } from '../context/WebSocketContext';
-import { sendRobotCommand } from '../api/robot';
+import SpotMicro3DViewer from '../components/SpotMicro3DViewer';
 import { getCoreState } from '../api/coreState';
 import { CoreState, AIState } from '../types';
 
@@ -61,7 +61,7 @@ const AIChip = ({ label, value }: { label: string; value: string }) => {
 };
 
 export default function BotDetailScreen({ route, navigation }: any) {
-  const { robotState: bot, telemetry, sendCameraSetup } = useWebSocket();
+  const { robotState: bot, telemetry, sendCameraSetup, connected, sendJoystick, sendArduinoCmd } = useWebSocket();
   const [localStatus, setLocalStatus] = useState(bot?.status || 'Hors ligne');
   const [coreState, setCoreState] = useState<CoreState | null>(null);
   const [loadingState, setLoadingState] = useState(true);
@@ -113,13 +113,8 @@ export default function BotDetailScreen({ route, navigation }: any) {
 
   const dotStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
 
-  const handleSetStatus = async (status: string, command: string) => {
-    setLocalStatus(status); // Optimistic / Fallback update
-    try {
-      await sendRobotCommand('set_status', command);
-    } catch(e) {
-      console.warn("Failed to send command", e);
-    }
+  const handleArduinoPose = (cmd: 'stand' | 'sit') => {
+    sendArduinoCmd(cmd);
   };
 
   // Sensors from CORE State
@@ -154,9 +149,24 @@ export default function BotDetailScreen({ route, navigation }: any) {
             style={styles.showcaseGradient}
           />
 
-          <View style={styles.renderMockContainer}>
-             <Text style={[styles.renderMockText, { color: bot.colorTheme }]}>[ 3D SHOWROOM ]</Text>
-          </View>
+          <SpotMicro3DViewer
+            mode="showcase"
+            joints={telemetry?.joints}
+            imu={telemetry?.imu}
+            connected={connected}
+            onJoystick={sendJoystick}
+            showModeBadge
+            style={styles.renderMockContainer}
+          />
+
+          <TouchableOpacity
+            style={styles.manualControlFab}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('RobotManualControl')}
+          >
+            <Gamepad2 color={theme.colors.background} size={20} />
+            <Text style={styles.manualControlFabText}>CONTRÔLE MANUEL</Text>
+          </TouchableOpacity>
           
           <View style={styles.titlesContainer}>
             <Text style={styles.botId}>{bot.id}</Text>
@@ -338,54 +348,33 @@ export default function BotDetailScreen({ route, navigation }: any) {
           )}
           
           <Text style={styles.sectionTitle}>C O M M A N D E S</Text>
+
+          <TouchableOpacity
+            style={styles.manualControlBtn}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('RobotManualControl')}
+          >
+            <Gamepad2 color={theme.colors.primary} size={24} />
+            <Text style={styles.manualControlBtnText}>CONTRÔLE MANUEL</Text>
+          </TouchableOpacity>
           
           <View style={styles.gridContainer}>
-            <DashboardButton 
-              icon={Lock} 
-              label="VERROUILLER"
-              isActive={localStatus === 'Hors ligne'} 
-              onToggle={() => handleSetStatus('Hors ligne', 'lock')}
+            <DashboardButton
+              icon={ArrowUp}
+              label="STAND"
+              activeColor={theme.colors.success}
+              onToggle={() => handleArduinoPose('stand')}
             />
-            <DashboardButton 
-              icon={Shield} 
-              label="GARDE"
-              activeColor={theme.colors.success} 
-              isActive={localStatus === 'En garde'} 
-              onToggle={() => handleSetStatus('En garde', 'guard')}
-            />
-            <DashboardButton 
-              icon={Footprints} 
-              label="PATROUILLE"
-              activeColor={theme.colors.secondary} 
-              isActive={localStatus === 'En patrouille'} 
-              onToggle={() => handleSetStatus('En patrouille', 'patrol')}
-            />
-            <DashboardButton 
-              icon={Power} 
-              label="CHARGE"
-              activeColor={theme.colors.danger} 
-              isActive={localStatus === 'En charge'} 
-              onToggle={() => handleSetStatus('En charge', 'charge')}
+            <DashboardButton
+              icon={ArrowDown}
+              label="SIT"
+              activeColor={theme.colors.secondary}
+              onToggle={() => handleArduinoPose('sit')}
             />
           </View>
 
           <Text style={styles.sectionTitle}>Quick Controls</Text>
           <View style={styles.qcCard}>
-            <View style={styles.qcRow}>
-              <View style={styles.qcRowLeft}>
-                <Power color={theme.colors.textMuted} size={22} />
-                <Text style={styles.qcLabel}>Power</Text>
-              </View>
-              <Switch 
-                value={localStatus === 'Hors ligne' ? false : true} 
-                onValueChange={(val) => handleSetStatus(val ? 'En ligne' : 'Hors ligne', val ? 'unlock' : 'lock')} 
-                trackColor={{ false: theme.colors.surface, true: '#fff' }}
-                thumbColor={localStatus !== 'Hors ligne' ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-
-            <View style={styles.qcDivider} />
-
             <View style={styles.qcRow}>
               <View style={styles.qcRowLeft}>
                 <Activity color="#4A90E2" size={22} />
@@ -398,11 +387,6 @@ export default function BotDetailScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.qcDivider} />
-
-            <TouchableOpacity style={styles.qcOutlineBtn} activeOpacity={0.6} onPress={() => handleSetStatus(localStatus, 'restart')}>
-              <RefreshCw color="#D4A373" size={20} />
-              <Text style={styles.qcOutlineBtnText}>Restart Device</Text>
-            </TouchableOpacity>
 
             <TouchableOpacity style={styles.qcOutlineBtn} activeOpacity={0.6} onPress={() => navigation.navigate('Settings')}>
               <SettingsIcon color="#D4A373" size={20} />
@@ -524,14 +508,31 @@ const styles = StyleSheet.create({
     ...theme.typography.small,
   },
   renderMockContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...StyleSheet.absoluteFillObject,
   },
-  renderMockText: {
-    ...theme.typography.h1,
-    fontSize: 48,
-    opacity: 0.1,
+  manualControlFab: {
+    position: 'absolute',
+    bottom: isDesktop ? 120 : 100,
+    right: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: theme.borderRadius.s,
+    zIndex: 5,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  manualControlFabText: {
+    ...theme.typography.small,
+    fontWeight: '800',
+    color: theme.colors.background,
+    letterSpacing: 1.5,
   },
   titlesContainer: {
     position: 'absolute',
@@ -573,6 +574,25 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.l,
     marginTop: theme.spacing.m,
+  },
+  manualControlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.m,
+    backgroundColor: theme.colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '60',
+    borderRadius: theme.borderRadius.s,
+    paddingVertical: theme.spacing.l,
+    paddingHorizontal: theme.spacing.xl,
+    marginBottom: theme.spacing.l,
+  },
+  manualControlBtnText: {
+    ...theme.typography.body,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    letterSpacing: 2,
   },
   gridContainer: {
     flexDirection: 'row',

@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { theme } from '../theme';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, Navigation } from 'lucide-react-native';
 import { useBots } from '../context/BotContext';
+import { useWebSocket } from '../context/WebSocketContext';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 export default function MapScreen({ navigation }: any) {
   const { bots } = useBots();
+  const { telemetry, connected, sendNavGoal } = useWebSocket();
   const [activeBot, setActiveBot] = useState(bots[0]);
   const [mapCenter, setMapCenter] = useState({ lat: bots[0].latitude, lng: bots[0].longitude });
   
@@ -58,6 +60,16 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.statValue}>{activeBot.battery}%</Text>
               </View>
             </View>
+            {connected && telemetry?.pose && (
+              <TouchableOpacity
+                style={styles.navGoalBtn}
+                activeOpacity={0.8}
+                onPress={() => sendNavGoal(telemetry.pose.x, telemetry.pose.y)}
+              >
+                <Navigation color={theme.colors.primary} size={16} />
+                <Text style={styles.navGoalText}>OBJECTIF SLAM</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </SafeAreaView>
@@ -106,5 +118,23 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     marginTop: theme.spacing.xs,
     fontWeight: '700',
-  }
+  },
+  navGoalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '60',
+    backgroundColor: theme.colors.primary + '15',
+    gap: 8,
+  },
+  navGoalText: {
+    ...theme.typography.small,
+    color: theme.colors.primary,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
 });

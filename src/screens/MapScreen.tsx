@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { theme } from '../theme';
-import { Target, ChevronRight } from 'lucide-react-native';
+import { Target, ChevronRight, Navigation } from 'lucide-react-native';
 import { useBots } from '../context/BotContext';
+import { useWebSocket } from '../context/WebSocketContext';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 export default function MapScreen({ navigation }: any) {
   const { bots } = useBots();
+  const { telemetry, connected, sendNavGoal } = useWebSocket();
   const [activeBot, setActiveBot] = useState(bots[0]);
   const [currentCoord, setCurrentCoord] = useState({
     latitude: activeBot.latitude,
@@ -37,6 +39,13 @@ export default function MapScreen({ navigation }: any) {
           longitudeDelta: 0.05,
         }}
         userInterfaceStyle="dark"
+        onPress={(e) => {
+          if (!connected || !telemetry?.pose) return;
+          const { latitude, longitude } = e.nativeEvent.coordinate;
+          const dx = (latitude - activeBot.latitude) * 100;
+          const dy = (longitude - activeBot.longitude) * 100;
+          sendNavGoal(telemetry.pose.x + dx, telemetry.pose.y + dy);
+        }}
       >
         {bots.map((bot) => (
           <Marker 
@@ -72,6 +81,16 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.statValue}>{activeBot.battery}%</Text>
               </View>
             </View>
+            {connected && telemetry?.pose && (
+              <TouchableOpacity
+                style={styles.navGoalBtn}
+                activeOpacity={0.8}
+                onPress={() => sendNavGoal(telemetry.pose.x, telemetry.pose.y)}
+              >
+                <Navigation color={theme.colors.primary} size={16} />
+                <Text style={styles.navGoalText}>OBJECTIF SLAM</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </SafeAreaView>
@@ -133,5 +152,23 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     marginTop: theme.spacing.xs,
     fontWeight: '700',
-  }
+  },
+  navGoalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '60',
+    backgroundColor: theme.colors.primary + '15',
+    gap: 8,
+  },
+  navGoalText: {
+    ...theme.typography.small,
+    color: theme.colors.primary,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
 });

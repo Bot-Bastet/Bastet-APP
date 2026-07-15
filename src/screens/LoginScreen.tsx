@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image, ScrollView, Pressable } from 'react-native';
 import { theme } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { login, register } from '../api/auth';
-import * as SecureStore from 'expo-secure-store';
+import { login, register, persistAuthSession, devBypassLogin } from '../api/auth';
 import { useWebSocket } from '../context/WebSocketContext';
 import { Mail, Lock, User, ChevronRight, Phone } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
@@ -57,16 +56,8 @@ export default function LoginScreen({ navigation }: any) {
       } else {
         const data = await login(email, password);
         if (data && data.token) {
-          const tokenStr = String(data.token);
-          const userStr = JSON.stringify(data.user);
-          if (Platform.OS !== 'web') {
-            await SecureStore.setItemAsync('jwt_token', tokenStr);
-            await SecureStore.setItemAsync('user_info', userStr);
-          } else {
-            localStorage.setItem('jwt_token', tokenStr);
-            localStorage.setItem('user_info', userStr);
-          }
-          connect(); // Initialize WebSocket
+          await persistAuthSession(data.token, data.user);
+          connect();
           navigation.replace('HomeStack');
         } else {
           throw new Error('Identifiant non reconnu');
@@ -77,6 +68,20 @@ export default function LoginScreen({ navigation }: any) {
       const msg = e.response?.data?.detail || e.response?.data?.message || e.message || 'Identifiants invalides ou erreur réseau.';
       setErrorMsg(msg);
       if (isRegister) setStep(1); // Retour à l'étape 1 si erreur
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDevBypass = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await devBypassLogin();
+      connect();
+      navigation.replace('HomeStack');
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Erreur lors du bypass dev.');
     } finally {
       setLoading(false);
     }
@@ -236,6 +241,17 @@ export default function LoginScreen({ navigation }: any) {
                 )}
               </LinearGradient>
             </Pressable>
+
+            {__DEV__ && (
+              <TouchableOpacity
+                onPress={handleDevBypass}
+                disabled={loading}
+                style={styles.devButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.devButtonText}>DEV — Passer le login</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
 
         </Animated.View>
@@ -422,5 +438,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.s,
     textDecorationLine: 'underline',
-  }
+  },
+  devButton: {
+    marginTop: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 204, 0, 0.35)',
+    backgroundColor: 'rgba(255, 204, 0, 0.08)',
+  },
+  devButtonText: {
+    ...theme.typography.small,
+    color: theme.colors.warning,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
 });

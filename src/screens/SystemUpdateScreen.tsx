@@ -9,6 +9,7 @@ import {
   triggerGatewayUpdate, getGatewayUpdateProgress,
   triggerRobotUpdate, getRobotUpdateProgress,
   triggerArduinoUpdate, getArduinoUpdateProgress,
+  rollbackGateway, rollbackRobot,
 } from '../api/systemUpdate';
 import { getCoreState } from '../api/coreState';
 
@@ -40,11 +41,12 @@ interface UpdateCardProps {
   loading: boolean;
   onTrigger: () => void;
   onRefresh: () => void;
+  onRollback?: () => void;
   delay?: number;
   version?: string;
 }
 
-const UpdateCard: React.FC<UpdateCardProps> = ({ title, icon: Icon, progress, loading, onTrigger, onRefresh, delay = 0, version }) => {
+const UpdateCard: React.FC<UpdateCardProps> = ({ title, icon: Icon, progress, loading, onTrigger, onRefresh, onRollback, delay = 0, version }) => {
   const status = progress?.status || 'idle';
   const percent = progress?.percent || 0;
   const isUpdating = status === 'downloading' || status === 'extracting';
@@ -141,6 +143,12 @@ const UpdateCard: React.FC<UpdateCardProps> = ({ title, icon: Icon, progress, lo
           )}
         </TouchableOpacity>
       </View>
+
+      {status === 'failed' && onRollback && (
+        <TouchableOpacity style={styles.rollbackBtn} onPress={onRollback} activeOpacity={0.7}>
+          <Text style={styles.rollbackBtnText}>ROLLBACK</Text>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 };
@@ -244,6 +252,34 @@ export default function SystemUpdateScreen({ navigation }: any) {
     }
   };
 
+  const handleRollbackGateway = async () => {
+    const version = gatewayProgress?.version || gatewayProgress?.latest_version;
+    if (!version) {
+      Alert.alert('Rollback', 'Aucune version cible disponible.');
+      return;
+    }
+    try {
+      await rollbackGateway(version);
+      setTimeout(() => fetchAll(true), 1000);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.response?.data?.detail || 'Rollback Gateway impossible.');
+    }
+  };
+
+  const handleRollbackRobot = async () => {
+    const version = robotProgress?.version || robotVersion;
+    if (!version) {
+      Alert.alert('Rollback', 'Aucune version cible disponible.');
+      return;
+    }
+    try {
+      await rollbackRobot(version);
+      setTimeout(() => fetchAll(true), 1000);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.response?.data?.detail || 'Rollback Robot impossible.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -269,6 +305,7 @@ export default function SystemUpdateScreen({ navigation }: any) {
           loading={loadingGateway}
           onTrigger={handleTriggerGateway}
           onRefresh={() => getGatewayUpdateProgress(true).then(setGatewayProgress).catch(() => {})}
+          onRollback={handleRollbackGateway}
           delay={100}
         />
 
@@ -279,6 +316,7 @@ export default function SystemUpdateScreen({ navigation }: any) {
           loading={loadingRobot}
           onTrigger={handleTriggerRobot}
           onRefresh={() => getRobotUpdateProgress(true).then(setRobotProgress).catch(() => {})}
+          onRollback={handleRollbackRobot}
           delay={200}
           version={robotVersion}
         />
@@ -422,5 +460,20 @@ const styles = StyleSheet.create({
     color: theme.colors.background,
     fontWeight: '700',
     marginLeft: theme.spacing.s,
+  },
+  rollbackBtn: {
+    marginTop: theme.spacing.m,
+    alignItems: 'center',
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: 'rgba(213, 0, 28, 0.1)',
+  },
+  rollbackBtnText: {
+    ...theme.typography.small,
+    color: theme.colors.danger,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
 });
